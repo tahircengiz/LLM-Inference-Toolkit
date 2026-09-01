@@ -1,4 +1,4 @@
-# secrets - never commit an endpoint or a key
+# gizli bilgi - endpoint ya da anahtar asla commit'e girmez
 .env
 .env.*
 !.env.example
@@ -12,13 +12,13 @@ __pycache__/
 .venv/
 venv/
 
-# editors / os
+# editör / işletim sistemi
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
-# scratch output
+# geçici çıktılar
 *.log
 answers.tsv
 out/
