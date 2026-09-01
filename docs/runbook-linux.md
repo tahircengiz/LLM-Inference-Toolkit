@@ -19,9 +19,9 @@ Windows kullanıyorsanız: [runbook-windows.md](runbook-windows.md).
 
 | Ortam | Kabuk | Python | curl / jq | Sonuç |
 | --- | --- | --- | --- | --- |
-| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 51/51 |
-| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 51/51 |
-| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 51/51 |
+| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 53/53 |
+| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 53/53 |
+| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 53/53 |
 
 Bash 3.2 bilinçli bir hedef: macOS'un getirdiği sürüm o, orada çalışan her şey
 modern Linux'ta da çalışır.
@@ -47,7 +47,7 @@ export LLM_RERANK_MODEL=mock-rerank
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```bash
-python3 tests/smoke_test.py          # beklenen: 51 geçti, 0 başarısız
+python3 tests/smoke_test.py          # beklenen: 53 geçti, 0 başarısız
 ```
 
 ---

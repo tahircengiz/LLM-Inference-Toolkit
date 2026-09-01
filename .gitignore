@@ -22,3 +22,6 @@ Thumbs.db
 *.log
 answers.tsv
 out/
+
+# gerçek endpoint raporları (adres ve model adları içerebilir)
+raporlar/

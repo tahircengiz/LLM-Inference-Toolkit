@@ -323,6 +323,26 @@ def main():
     run("python: ölü endpoint'i raporluyor", [py, embed_script, "merhaba"],
         e_bad, want_code=1)
 
+    # ---- rapor aracı ------------------------------------------------------
+    # capture_report.py gerçek endpoint'lere karşı elle çalıştırılır; burada
+    # sahte sunucuya karşı bir kez koşturarak bozulmadığından emin oluyoruz.
+    import tempfile
+    rapor_yolu = os.path.join(tempfile.gettempdir(), "smoke_capture_report.md")
+    run("python: rapor aracı çalışıyor",
+        [py, os.path.join(ROOT, "tests", "capture_report.py"),
+         "--label", "sahte sunucu", "-e", base, "-k", "sk-mock",
+         "-m", mock_server.MODEL_ID, "--embed-model", mock_server.EMBED_MODEL_ID,
+         "--rerank-model", mock_server.RERANK_MODEL_ID,
+         "--load-requests", "2", "--load-concurrency", "1", "-o", rapor_yolu],
+        env, expect=["Rapor yazıldı"])
+    if os.path.exists(rapor_yolu):
+        icerik = open(rapor_yolu, encoding="utf-8").read()
+        tamam = "# Test raporu" in icerik and "sk-mock" not in icerik
+        record("python: rapor anahtarı maskeliyor", "PASS" if tamam else "FAIL",
+               "%d satır%s" % (len(icerik.splitlines()),
+                               "" if tamam else " · API anahtarı raporda görünüyor"))
+        os.remove(rapor_yolu)
+
     srv.shutdown()
     auth_srv.shutdown()
     ttft_srv.shutdown()

@@ -16,6 +16,8 @@ API_KEY="${LLM_API_KEY:-}"
 MODEL="${LLM_MODEL:-}"
 EMBED_MODEL="${LLM_EMBED_MODEL:-}"
 RERANK_MODEL="${LLM_RERANK_MODEL:-}"
+EMBED_ENDPOINT="${LLM_EMBED_ENDPOINT:-}"
+RERANK_ENDPOINT="${LLM_RERANK_ENDPOINT:-}"
 FULL=false
 QUIET=false
 TIMEOUT=60
@@ -35,6 +37,10 @@ Endpoint'in çalışıp çalışmadığını tek komutla söyler.
   -m, --model AD         Model adı (env: LLM_MODEL)
       --embed-model AD   Embedding modeli (env: LLM_EMBED_MODEL), --full için
       --rerank-model AD  Reranker modeli (env: LLM_RERANK_MODEL), --full için
+      --embed-endpoint URL   Embedding ayrı bir adreste servis ediliyorsa
+                         (env: LLM_EMBED_ENDPOINT)
+      --rerank-endpoint URL  Rerank ayrı bir adreste servis ediliyorsa
+                         (env: LLM_RERANK_ENDPOINT)
       --full             Gelişmiş kontroller: model yoklama, embeddings ve rerank
                          sağlık paketleri ve kısa bir yük testi de çalıştırılır
       --timeout N        İstek zaman aşımı (saniye), varsayılan 60
@@ -56,6 +62,8 @@ while [[ $# -gt 0 ]]; do
         -m|--model)       MODEL="$2"; shift 2 ;;
         --embed-model)    EMBED_MODEL="$2"; shift 2 ;;
         --rerank-model)   RERANK_MODEL="$2"; shift 2 ;;
+        --embed-endpoint) EMBED_ENDPOINT="$2"; shift 2 ;;
+        --rerank-endpoint) RERANK_ENDPOINT="$2"; shift 2 ;;
         --full)           FULL=true; shift ;;
         --timeout)        TIMEOUT="$2"; shift 2 ;;
         -i|--insecure)    INSECURE=true; shift ;;
@@ -311,17 +319,19 @@ if $FULL; then
     elif [[ ! -f "$embed_betik" ]]; then
         satir UYARI "embeddings" "embed-test.py bulunamadı"
     else
-        embed_cikti="$(LLM_ENDPOINT="$base" LLM_API_KEY="$API_KEY" LLM_EMBED_MODEL="$EMBED_MODEL" \
-            python3 "$embed_betik" --suite 2>&1 | tail -1)"
-        if [[ "$embed_cikti" == *"geçti"* && "$embed_cikti" != *"0/"* ]]; then
-            gecen="${embed_cikti%% *}"
-            if [[ "${gecen%%/*}" == "${gecen##*/}" ]]; then
-                satir PASS "embeddings" "$embed_cikti"
-            else
-                satir FAIL "embeddings" "$embed_cikti (detay: embed-test.py --suite)"
-            fi
+        # Alt paketin metnini değil exit kodunu esas alıyoruz: paket UYARI'lı
+        # geçtiğinde (ör. quantize modelde küçük sapma) exit 0 döner ve bu
+        # "sağlıksız" demek değildir.
+        embed_tam="$(LLM_ENDPOINT="${EMBED_ENDPOINT:-$base}" LLM_API_KEY="$API_KEY" \
+            LLM_EMBED_MODEL="$EMBED_MODEL" python3 "$embed_betik" --suite 2>&1)"
+        embed_kod=$?
+        embed_cikti="$(printf '%s\n' "$embed_tam" | tail -1 | cut -c1-72)"
+        if [[ $embed_kod -eq 0 && "$embed_cikti" == *"uyarı"* ]]; then
+            satir UYARI "embeddings" "$embed_cikti"
+        elif [[ $embed_kod -eq 0 ]]; then
+            satir PASS "embeddings" "$embed_cikti"
         else
-            satir FAIL "embeddings" "sağlık paketi çalışmadı"
+            satir FAIL "embeddings" "${embed_cikti:-yanıt yok} (detay: embed-test.py --suite)"
         fi
     fi
 
@@ -333,17 +343,16 @@ if $FULL; then
     elif [[ ! -f "$rerank_betik" ]]; then
         satir UYARI "rerank" "rerank-test.py bulunamadı"
     else
-        rerank_cikti="$(LLM_ENDPOINT="$base" LLM_API_KEY="$API_KEY" LLM_RERANK_MODEL="$RERANK_MODEL" \
-            python3 "$rerank_betik" --suite 2>&1 | tail -1)"
-        if [[ "$rerank_cikti" == *"geçti"* ]]; then
-            gecen_r="${rerank_cikti%% *}"
-            if [[ "${gecen_r%%/*}" == "${gecen_r##*/}" ]]; then
-                satir PASS "rerank" "$rerank_cikti"
-            else
-                satir FAIL "rerank" "$rerank_cikti (detay: rerank-test.py --suite)"
-            fi
+        rerank_tam="$(LLM_ENDPOINT="${RERANK_ENDPOINT:-$base}" LLM_API_KEY="$API_KEY" \
+            LLM_RERANK_MODEL="$RERANK_MODEL" python3 "$rerank_betik" --suite 2>&1)"
+        rerank_kod=$?
+        rerank_cikti="$(printf '%s\n' "$rerank_tam" | tail -1 | cut -c1-72)"
+        if [[ $rerank_kod -eq 0 && "$rerank_cikti" == *"uyarı"* ]]; then
+            satir UYARI "rerank" "$rerank_cikti"
+        elif [[ $rerank_kod -eq 0 ]]; then
+            satir PASS "rerank" "$rerank_cikti"
         else
-            satir FAIL "rerank" "sağlık paketi çalışmadı"
+            satir FAIL "rerank" "${rerank_cikti:-yanıt yok} (detay: rerank-test.py --suite)"
         fi
     fi
 

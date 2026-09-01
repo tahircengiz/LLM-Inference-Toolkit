@@ -124,6 +124,7 @@ Referans dokümanlar:
 | [`python/embed-test.py`](python/embed-test.py) | Python 3.8+ (yalnızca stdlib) | `/v1/embeddings` | Embed, cosine çiftleri, 7 kontrollük sağlık paketi ve eşzamanlılık benchmark'ı |
 | [`python/rerank-test.py`](python/rerank-test.py) | Python 3.8+ (yalnızca stdlib) | `/v1/rerank` | Sorgu–doküman sıralaması, 8 kontrollük sağlık paketi ve throughput benchmark'ı |
 | [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (yalnızca stdlib) | hepsi | GPU'suz denemek için sahte OpenAI uyumlu sunucu — `-m error-404` ile tekrarlanabilir HTTP hataları da üretir |
+| [`tests/capture_report.py`](tests/capture_report.py) | Python 3.8+ (yalnızca stdlib) | hepsi | Gerçek bir endpoint'e karşı tüm bataryayı çalıştırıp markdown rapor üretir (anahtar maskeli) |
 | [`tests/smoke_test.py`](tests/smoke_test.py) | Python 3.8+ (yalnızca stdlib) | — | Yukarıdaki her betiği sahte sunucuya karşı çalıştırır; kurulu olmayan ortamları atlar |
 
 ## Nerede test ediliyor?
@@ -148,17 +149,27 @@ Kendi endpoint'inize karşı çalıştırmak için:
 bash/llm-check.sh -e http://SUNUCU:PORT -k ANAHTAR -m MODEL --full
 ```
 
+Tüm bataryayı çalıştırıp gözden geçirilecek bir markdown rapor üretmek için:
+
+```bash
+python3 tests/capture_report.py --label "vLLM prod" \
+  -e http://SUNUCU:PORT -k ANAHTAR -m MODEL -o raporlar/vllm.md
+```
+
+Neyin doğrulanıp neyin doğrulanmadığı, madde madde:
+**[docs/test-checklist.md](docs/test-checklist.md)**.
+
 ## Doğrulandığı ortamlar
 
 Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, sonuç:
 
 | Ortam | Bash betikleri | PowerShell betikleri | Python betikleri | Sonuç |
 | --- | --- | --- | --- | --- |
-| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
-| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
-| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 32/32 |
-| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | 32/32 |
-| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 51/51 |
+| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 53/53 |
+| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 53/53 |
+| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 34/34 |
+| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | 34/34 |
+| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 53/53 |
 
 Embedding sağlık paketi **üç platformda da birebir aynı cosine değerlerini**
 döndürüyor; runbook'lardaki beklenen değerleri yazmaya değer kılan da bu.
@@ -354,7 +365,7 @@ PASS  bash: --probe bozuk modeli yakalıyor       MODEL       STATUS    LATENCY 
 PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=407ms itl_p50=12ms (sunucu 400ms prefill + 10ms chunk)
 PASS  python: sağlık paketi                      PASS   batch içinde dim tutarlı               dim=128
 ...
-51 geçti, 0 başarısız, 0 atlandı/uyarı
+53 geçti, 0 başarısız, 0 atlandı/uyarı
 ```
 
 Kurulu olmayan çalışma ortamları `FAIL` değil `SKIP` olarak raporlanır, böylece

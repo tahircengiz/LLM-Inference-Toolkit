@@ -24,6 +24,10 @@ param(
     [string]$EmbedModel = $env:LLM_EMBED_MODEL,
     [string]$RerankModel = $env:LLM_RERANK_MODEL,
 
+    # Embedding / rerank ayrı bir adreste servis ediliyorsa
+    [string]$EmbedEndpoint = $env:LLM_EMBED_ENDPOINT,
+    [string]$RerankEndpoint = $env:LLM_RERANK_ENDPOINT,
+
     # Gelişmiş kontroller: model yoklama, embeddings ve rerank paketleri, kısa yük testi
     [switch]$Full,
 
@@ -346,19 +350,21 @@ if ($Full) {
         Write-Satir 'UYARI' 'embeddings' 'embed-test.py bulunamadı'
     } else {
         $env:LLM_EMBED_MODEL = $EmbedModel
+        if ($EmbedEndpoint) { $env:LLM_ENDPOINT = (Resolve-BaseUri $EmbedEndpoint) }
+        # Alt paketin metnini değil exit kodunu esas alıyoruz: UYARI'lı geçiş
+        # exit 0 döner ve bu "sağlıksız" demek değildir.
         $cikti = & $py $embedBetik --suite 2>&1 | Out-String
-        $ozet = ($cikti -split "`r?`n" | Where-Object { $_ -match 'geçti' } | Select-Object -Last 1)
-        if ($ozet) {
-            $ozet = $ozet.Trim()
-            $oran = ($ozet -split ' ')[0]
-            $parcalar = $oran -split '/'
-            if ($parcalar.Count -eq 2 -and $parcalar[0] -eq $parcalar[1]) {
-                Write-Satir 'PASS' 'embeddings' $ozet
-            } else {
-                Write-Satir 'FAIL' 'embeddings' ("{0} (detay: embed-test.py --suite)" -f $ozet)
-            }
+        $kod = $LASTEXITCODE
+        $env:LLM_ENDPOINT = $baseUri
+        $son = ($cikti -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
+        if ($son) { $son = $son.Trim() } else { $son = 'yanıt yok' }
+        if ($son.Length -gt 72) { $son = $son.Substring(0, 72) }
+        if ($kod -eq 0 -and $son -match 'uyarı') {
+            Write-Satir 'UYARI' 'embeddings' $son
+        } elseif ($kod -eq 0) {
+            Write-Satir 'PASS' 'embeddings' $son
         } else {
-            Write-Satir 'FAIL' 'embeddings' 'sağlık paketi çalışmadı'
+            Write-Satir 'FAIL' 'embeddings' ("{0} (detay: embed-test.py --suite)" -f $son)
         }
     }
 
@@ -371,19 +377,21 @@ if ($Full) {
         Write-Satir 'UYARI' 'rerank' 'rerank-test.py bulunamadı'
     } else {
         $env:LLM_RERANK_MODEL = $RerankModel
+        if ($RerankEndpoint) { $env:LLM_ENDPOINT = (Resolve-BaseUri $RerankEndpoint) }
+        # Alt paketin metnini değil exit kodunu esas alıyoruz: UYARI'lı geçiş
+        # exit 0 döner ve bu "sağlıksız" demek değildir.
         $cikti = & $py $rerankBetik --suite 2>&1 | Out-String
-        $ozet = ($cikti -split "`r?`n" | Where-Object { $_ -match 'geçti' } | Select-Object -Last 1)
-        if ($ozet) {
-            $ozet = $ozet.Trim()
-            $oran = ($ozet -split ' ')[0]
-            $parcalar = $oran -split '/'
-            if ($parcalar.Count -eq 2 -and $parcalar[0] -eq $parcalar[1]) {
-                Write-Satir 'PASS' 'rerank' $ozet
-            } else {
-                Write-Satir 'FAIL' 'rerank' ("{0} (detay: rerank-test.py --suite)" -f $ozet)
-            }
+        $kod = $LASTEXITCODE
+        $env:LLM_ENDPOINT = $baseUri
+        $son = ($cikti -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
+        if ($son) { $son = $son.Trim() } else { $son = 'yanıt yok' }
+        if ($son.Length -gt 72) { $son = $son.Substring(0, 72) }
+        if ($kod -eq 0 -and $son -match 'uyarı') {
+            Write-Satir 'UYARI' 'rerank' $son
+        } elseif ($kod -eq 0) {
+            Write-Satir 'PASS' 'rerank' $son
         } else {
-            Write-Satir 'FAIL' 'rerank' 'sağlık paketi çalışmadı'
+            Write-Satir 'FAIL' 'rerank' ("{0} (detay: rerank-test.py --suite)" -f $son)
         }
     }
 

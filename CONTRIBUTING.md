@@ -76,6 +76,13 @@ sayfası, runbook'lara da **komut + birebir beklenen çıktı** ekleyin.
 Bu deponun sözü şu: dokümanda yazan her çıktı gerçekten çalıştırılıp
 doğrulanmıştır. Hafızadan yazılmış örnek eklemeyin.
 
+## Yayına hazırlık
+
+Yeni bir yetenek eklendiğinde [docs/test-checklist.md](docs/test-checklist.md)
+dosyasına maddesini ekleyin ve gerçek bir backend'de doğrulanana kadar
+`compatibility.md` içinde "doğrulandı" diye etiketlemeyin. Sahte sunucu betiği
+doğrular, sunucuyu değil.
+
 ## Backend davranışı bildirmek
 
 En değerli issue'lar "şu backend farklı davranıyor" diyenler. Sunucu ve
