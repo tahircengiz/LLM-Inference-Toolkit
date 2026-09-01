@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Toolchain
+        shell: bash
+        run: |
+          python --version
+          curl --version | head -1 || true
+          jq --version || echo "jq not installed - python3 fallback will be used"
+          pwsh --version || echo "pwsh not installed - PowerShell checks will be skipped"
+
+      - name: Run every script against the mock server
+        run: python tests/smoke_test.py -v
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: ShellCheck
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          fi
+          shellcheck --version
+          shellcheck --severity=error bash/llm-prompt.sh
+
+      - name: Bash syntax
+        run: bash -n bash/llm-prompt.sh
+
+      - name: Python compile
+        run: python -m compileall -q python examples tests
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          $findings = Invoke-ScriptAnalyzer -Path powershell -Recurse -Severity Error
+          if ($findings) { $findings | Format-Table -AutoSize; exit 1 }
+          Write-Host "PSScriptAnalyzer: no errors"
