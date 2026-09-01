@@ -145,6 +145,13 @@ time llm-prompt.sh -n 1 "hi" >/dev/null
 llm-prompt.sh -m "$MODEL" -n 8 "ping" | grep -qi . || { echo "empty answer"; exit 1; }
 ```
 
+**Confirm the model exists before calling it** (see [models.md](models.md))
+
+```bash
+llm-models.sh --has "$LLM_MODEL" || { echo "model missing on $LLM_ENDPOINT"; exit 1; }
+llm-prompt.sh "..."
+```
+
 **Check what a gateway actually routes to**
 
 ```bash

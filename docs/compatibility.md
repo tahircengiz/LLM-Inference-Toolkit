@@ -34,6 +34,19 @@ page collects the per-backend details that trip people up.
 | **Ollama** | `http://host:11434` | `/v1/embeddings` with an embedding model such as `nomic-embed-text` |
 | **OpenAI** | `https://api.openai.com` | `text-embedding-3-small/large`, supports `dimensions` |
 
+## Model listings (`/v1/models`)
+
+| Backend | What the listing contains |
+| --- | --- |
+| **vLLM** | The served model plus `max_model_len` — the quickest check that `--served-model-name` is what you think |
+| **llama.cpp** | The single loaded model; the `model` field is ignored on chat, so the listing is the only honest source |
+| **Ollama** | Pulled tags (`llama3.1:8b`). Any bearer token is accepted, but one must be sent |
+| **TGI** | Often a single entry named `tgi` |
+| **LiteLLM / gateways** | Your virtual aliases, not upstream names. An alias can be listed and still be unrouted — `llm-models.sh --probe` is what catches that |
+| **OpenAI** | Everything your key can see; filter before probing |
+
+See [models.md](models.md) for the helper that reads these.
+
 ## What "OpenAI-compatible" does not guarantee
 
 These are the differences that actually cause incidents. The scripts in this

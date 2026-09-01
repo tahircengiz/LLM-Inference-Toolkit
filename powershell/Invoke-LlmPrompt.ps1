@@ -66,9 +66,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-foreach ($p in 'Endpoint', 'ApiKey', 'Model') {
+$required = [ordered]@{ Endpoint = 'LLM_ENDPOINT'; ApiKey = 'LLM_API_KEY'; Model = 'LLM_MODEL' }
+foreach ($p in $required.Keys) {
     if ([string]::IsNullOrWhiteSpace((Get-Variable $p -ValueOnly))) {
-        [Console]::Error.WriteLine("-$p is required (or set `$env:LLM_$($p.ToUpper())`).")
+        [Console]::Error.WriteLine("-$p is required (or set `$env:$($required[$p])).")
         exit 1
     }
 }

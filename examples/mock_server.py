@@ -6,7 +6,7 @@ Lets you try every script in this repo (and run the smoke tests) without a GPU,
 a model, or network access. It implements just enough of the API surface the
 scripts touch:
 
-    GET  /v1/models
+    GET  /v1/models                (three models, one deliberately broken)
     POST /v1/chat/completions      (blocking and stream=true / SSE)
     POST /v1/embeddings            (float and base64 encoding_format)
 
@@ -34,6 +34,19 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MODEL_ID = "mock-model"
+EMBED_MODEL_ID = "mock-embed"
+BROKEN_MODEL_ID = "error-503"
+
+# Fixed timestamps so /v1/models output is byte-identical on every machine.
+# 1735689600 = 2025-01-01T00:00:00Z, 1740787200 = 2025-03-01T00:00:00Z
+CATALOG = [
+    {"id": MODEL_ID, "object": "model", "created": 1735689600, "owned_by": "mock",
+     "max_model_len": 8192},
+    {"id": EMBED_MODEL_ID, "object": "model", "created": 1740787200, "owned_by": "mock",
+     "max_model_len": 512},
+    # Advertised but not usable - so a probe run has a reproducible failure row.
+    {"id": BROKEN_MODEL_ID, "object": "model", "owned_by": "mock"},
+]
 DEFAULT_DIM = 128
 REPLY = "Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ"
 
@@ -140,8 +153,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.rstrip("/").endswith("/v1/models"):
             if not self._authorized():
                 return
-            self._json({"object": "list", "data": [
-                {"id": MODEL_ID, "object": "model", "owned_by": "mock"}]})
+            self._json({"object": "list", "data": CATALOG})
         else:
             self._error(404, "unknown route %s" % self.path, "not_found")
 
@@ -164,6 +176,10 @@ class Handler(BaseHTTPRequestHandler):
             self._error(400, "'model' is a required property")
             return
         if self._maybe_injected_error(body["model"]):
+            return
+        if body["model"] == EMBED_MODEL_ID:
+            self._error(400, "this model does not support chat completions",
+                        "invalid_request_error")
             return
         messages = body.get("messages") or []
         if not messages:

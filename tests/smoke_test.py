@@ -51,8 +51,8 @@ def record(name, status, detail=""):
     print("%-5s %-42s %s" % (status, name, detail), flush=True)
 
 
-def run(name, argv, env, expect=(), expect_soft=(), want_code=0, stdin=None):
-    """Run a command, assert exit code and expected substrings in stdout."""
+def run(name, argv, env, expect=(), expect_soft=(), reject=(), want_code=0, stdin=None):
+    """Run a command, assert exit code and expected/forbidden substrings in stdout."""
     try:
         proc = subprocess.run(argv, env=env, input=stdin, capture_output=True,
                               text=True, encoding="utf-8", errors="replace", timeout=120)
@@ -76,6 +76,11 @@ def run(name, argv, env, expect=(), expect_soft=(), want_code=0, stdin=None):
     missing = [s for s in expect if s not in out]
     if missing:
         record(name, "FAIL", "missing %r in output: %s" % (missing, out.strip()[:200]))
+        return proc
+
+    present = [s for s in reject if s in out]
+    if present:
+        record(name, "FAIL", "unexpected %r in output" % present)
         return proc
 
     soft = [s for s in expect_soft if s not in out]
@@ -139,6 +144,21 @@ def main():
             [bash, bash_script, "-m", "", "Merhaba"], env, want_code=1)
         run("bash: surfaces an HTTP error",
             [bash, bash_script, "-m", "error-404", "Merhaba"], env, want_code=1)
+        models_script = os.path.join(ROOT, "bash", "llm-models.sh")
+        run("bash: models list", [bash, models_script], env,
+            expect=[mock_server.MODEL_ID, mock_server.EMBED_MODEL_ID])
+        run("bash: models table", [bash, models_script, "-l"], env,
+            expect=["MODEL", "CONTEXT", "8192", "2025-01-01T00:00:00Z"])
+        run("bash: models filter", [bash, models_script, "embed"], env,
+            expect=[mock_server.EMBED_MODEL_ID], reject=[mock_server.MODEL_ID])
+        run("bash: --has a served model",
+            [bash, models_script, "--has", mock_server.MODEL_ID], env)
+        run("bash: --has an absent model",
+            [bash, models_script, "--has", "no-such-model"], env, want_code=1)
+        run("bash: --probe reports broken models",
+            [bash, models_script, "--probe"], env,
+            expect=["ok", "503", "1/3 models answered"], want_code=1)
+
         # endpoint normalization: base, /v1 and the full path must all work
         for suffix in ("/v1", "/v1/chat/completions"):
             e2 = dict(env, LLM_ENDPOINT=base + suffix)
@@ -173,6 +193,21 @@ def main():
         run("powershell: surfaces an HTTP error",
             [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba",
              "-Model", "error-404"], env, want_code=1)
+
+        ps_models = os.path.join(ROOT, "powershell", "Get-LlmModels.ps1")
+        psrun = [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_models]
+        run("powershell: models list", psrun, env,
+            expect=[mock_server.MODEL_ID, mock_server.EMBED_MODEL_ID])
+        run("powershell: models table", psrun + ["-Long"], env,
+            expect=["Model", "Context", "8192", "2025-01-01T00:00:00Z"])
+        run("powershell: models filter", psrun + ["mock-embed"], env,
+            expect=[mock_server.EMBED_MODEL_ID], reject=[mock_server.MODEL_ID])
+        run("powershell: --has a served model",
+            psrun + ["-Has", mock_server.MODEL_ID], env)
+        run("powershell: --has an absent model",
+            psrun + ["-Has", "no-such-model"], env, want_code=1)
+        run("powershell: --probe reports broken models", psrun + ["-Probe"], env,
+            expect=["ok", "503"], want_code=1)
 
     # ---- python embeddings ----------------------------------------------
     run("python: embed single text", [py, embed_script, "merhaba dünya"],

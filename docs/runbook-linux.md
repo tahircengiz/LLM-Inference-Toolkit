@@ -11,9 +11,9 @@ Windows users: see [runbook-windows.md](runbook-windows.md) instead.
 
 | Environment | Shell | Python | curl / jq | Result |
 | --- | --- | --- | --- | --- |
-| macOS 26.5.2 (local) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 19/19 |
-| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 19/19 |
-| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 19/19 |
+| macOS 26.5.2 (local) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 31/31 |
+| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 31/31 |
+| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 31/31 |
 
 Bash 3.2 is deliberate: it is what macOS ships, so anything that works there
 works on every modern Linux too.
@@ -23,7 +23,7 @@ works on every modern Linux too.
 ```bash
 git clone https://github.com/tahircengiz/LLM-Inference-Toolkit.git
 cd LLM-Inference-Toolkit
-chmod +x bash/llm-prompt.sh python/embed-test.py
+chmod +x bash/llm-prompt.sh bash/llm-models.sh python/embed-test.py
 
 # Terminal 1 - the mock server that produces the expected values below
 python3 examples/mock_server.py --port 8899
@@ -38,7 +38,7 @@ export LLM_EMBED_MODEL=mock-model
 To run every test at once instead of one by one:
 
 ```bash
-python3 tests/smoke_test.py          # expect: 19 passed, 0 failed
+python3 tests/smoke_test.py          # expect: 31 passed, 0 failed
 ```
 
 ---
@@ -155,6 +155,125 @@ exit=1
 ```
 
 **Pass:** exit `1` before any network call. Same for a missing endpoint or key.
+
+---
+
+## Model discovery
+
+### L09 — List what the endpoint serves
+
+```bash
+bash/llm-models.sh
+```
+
+```
+mock-model
+mock-embed
+error-503
+```
+
+**Pass:** exit `0` · one id per line, in the server's own order · pipeable
+(`bash/llm-models.sh | wc -l`). The mock deliberately advertises three models,
+one of which does not work — that is what makes L12 reproducible.
+
+### L10 — Metadata table
+
+```bash
+bash/llm-models.sh -l
+```
+
+```
+MODEL       OWNER  CREATED               CONTEXT
+mock-model  mock   2025-01-01T00:00:00Z  8192
+mock-embed  mock   2025-03-01T00:00:00Z  512
+error-503   mock   -                     -
+
+3 model(s)
+```
+
+**Pass:** exit `0` · timestamps in UTC ISO-8601 (machine-independent) · `-`
+wherever the server publishes nothing. `CONTEXT` reads `max_model_len`, then
+`context_length`, then `max_input_tokens` — with vLLM this is the quickest way
+to see the real `--max-model-len` in effect.
+**Varies:** nothing. This output is byte-identical on every machine.
+
+### L11 — Filter by substring
+
+```bash
+bash/llm-models.sh embed
+```
+
+```
+mock-embed
+```
+
+**Pass:** exit `0` · case-insensitive match on the id · exit `1` with
+`no model matches <pattern>` when nothing matches. Useful against a gateway
+that lists hundreds of aliases.
+
+### L12 — Probe: which models actually answer?
+
+```bash
+bash/llm-models.sh --probe; echo "exit=$?"
+```
+
+```
+MODEL       STATUS    LATENCY  NOTE
+mock-model  ok           16ms
+mock-embed  400          17ms  this model does not support chat completions
+error-503   503          17ms  injected error for model 'error-503'
+
+1/3 models answered
+exit=1
+```
+
+**Pass:** exit `1` — because one advertised model fails, which is the point of
+the test · every model gets a row · the NOTE column carries the **server's own**
+error message.
+**Varies:** the latency column.
+
+A `400` on an embedding model is correct behaviour, not a fault. Read the NOTE
+before concluding anything. Each probe is a real `max_tokens: 1` request, so
+filter first on a paid gateway: `bash/llm-models.sh --probe qwen`.
+
+### L13 — Assert a model is served (CI gate)
+
+```bash
+bash/llm-models.sh --has mock-model;     echo "exit=$?"
+bash/llm-models.sh --has no-such-model;  echo "exit=$?"
+```
+
+```
+exit=0
+model 'no-such-model' is not served by http://127.0.0.1:8899/v1/models
+exit=1
+```
+
+**Pass:** silent success (like `grep -q`), one stderr line and exit `1` on a
+miss. Matching is exact and case-sensitive — the same way the server matches.
+
+```bash
+bash/llm-models.sh --has "$LLM_MODEL" || { echo "model missing"; exit 1; }
+```
+
+### L14 — Raw JSON
+
+```bash
+bash/llm-models.sh --json | jq '.data[0]'
+```
+
+```json
+{
+  "id": "mock-model",
+  "object": "model",
+  "created": 1735689600,
+  "owned_by": "mock",
+  "max_model_len": 8192
+}
+```
+
+**Pass:** exit `0` · valid JSON. Use this when a server publishes extra fields
+worth reading (vLLM adds `max_model_len` and `permission`).
 
 ---
 
@@ -296,6 +415,9 @@ What to expect instead of the mock's fixed values:
 | L02 | Tokens appear progressively. If the whole answer lands at once, a proxy is buffering — see [troubleshooting](troubleshooting.md#streaming-prints-nothing) |
 | L03 | `model` matches what you requested. A different value means the gateway rerouted you |
 | L07 | Try a deliberately wrong model name: expect `HTTP 404` or `HTTP 400` with the server's message |
+| L09–L10 | The real catalogue. On vLLM, `CONTEXT` should equal the `--max-model-len` you deployed with — if it does not, the server won the argument |
+| L12 | `n/n models answered`. Anything else is either an embedding/reranker model (fine — read the NOTE) or a broken route (not fine) |
+| L13 | Wire it into your deploy pipeline ahead of the first real request |
 | E01 | `dim` = the model's real width · `\|v\|` = 1.0 for most retrieval models |
 | E02 | Paraphrase ≫ unrelated. A thin margin means the model is a poor fit for your language or domain |
 | E03 | `7/7 passed`. Any FAIL is explained in [troubleshooting](troubleshooting.md#results-that-look-wrong) — treat *batch position* and *L2-normalized* as blockers |

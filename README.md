@@ -32,6 +32,8 @@ package install** — `curl` + `jq`, .NET, or the Python standard library.
 | --- | --- | --- | --- |
 | [`bash/llm-prompt.sh`](bash/llm-prompt.sh) | Bash 3.2+, `curl`, `jq` *or* `python3` | `/v1/chat/completions` | Single prompt, optional SSE streaming, token usage / latency / tok-s |
 | [`powershell/Invoke-LlmPrompt.ps1`](powershell/Invoke-LlmPrompt.ps1) | PowerShell 5.1 or 7+ | `/v1/chat/completions` | Same, with no `curl.exe` dependency; handles TLS 1.2 and UTF-8 on Windows PowerShell |
+| [`bash/llm-models.sh`](bash/llm-models.sh) | Bash 3.2+, `curl`, `jq` *or* `python3` | `/v1/models` | List, filter and assert what is served; probe each model to see which really answer |
+| [`powershell/Get-LlmModels.ps1`](powershell/Get-LlmModels.ps1) | PowerShell 5.1 or 7+ | `/v1/models` | Same, emitting objects so it composes with `Where-Object` / `Export-Csv` |
 | [`python/embed-test.py`](python/embed-test.py) | Python 3.8+ (stdlib only) | `/v1/embeddings` | Embed text, cosine pairs, a 7-check sanity suite, and a concurrency benchmark |
 | [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (stdlib only) | both | A fake OpenAI-compatible server so you can try everything with no GPU — including reproducible HTTP errors via `-m error-404` |
 | [`tests/smoke_test.py`](tests/smoke_test.py) | Python 3.8+ (stdlib only) | — | Runs every script above against the mock; skips runtimes you don't have |
@@ -47,7 +49,8 @@ produce**, verified on a real run rather than written from memory.
 | Windows | **[docs/runbook-windows.md](docs/runbook-windows.md)** | `powershell\Invoke-LlmPrompt.ps1` |
 
 Reference material:
-[flag reference](docs/chat-completions.md) ·
+[chat completions](docs/chat-completions.md) ·
+[model discovery](docs/models.md) ·
 [embeddings guide](docs/embeddings.md) ·
 [backend compatibility](docs/compatibility.md) ·
 [troubleshooting](docs/troubleshooting.md)
@@ -57,12 +60,12 @@ Reference material:
 Every push runs the full suite on three operating systems. These are results,
 not intentions:
 
-| Environment | Chat (Bash) | Chat (PowerShell) | Embeddings | Result |
+| Environment | Bash scripts | PowerShell scripts | Embeddings | Result |
 | --- | --- | --- | --- | --- |
-| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 19/19 |
-| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 19/19 |
-| `windows-latest` — pwsh 7.6.5, Python 3.14 | skipped by design | ✅ | ✅ | 11/11 |
-| macOS 26.5 local — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 19/19 |
+| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 31/31 |
+| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 31/31 |
+| `windows-latest` — pwsh 7.6.5, Python 3.14 | skipped by design | ✅ | ✅ | 17/17 |
+| macOS 26.5 local — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 31/31 |
 
 The embeddings sanity suite returns **identical cosine values on all three
 platforms**, which is what makes the expected values in the runbooks worth
@@ -94,6 +97,8 @@ export LLM_ENDPOINT=http://127.0.0.1:8899
 export LLM_API_KEY=sk-mock
 export LLM_MODEL=mock-model
 
+bash/llm-models.sh -l                        # what is served?
+bash/llm-models.sh --probe                   # which of them actually answer?
 bash/llm-prompt.sh "Merhaba, kendini tanıt"
 bash/llm-prompt.sh --stream "Bir haiku yaz"
 python3 python/embed-test.py --suite
@@ -104,6 +109,8 @@ $env:LLM_ENDPOINT = 'http://127.0.0.1:8899'
 $env:LLM_API_KEY  = 'sk-mock'
 $env:LLM_MODEL    = 'mock-model'
 
+.\powershell\Get-LlmModels.ps1 -Long
+.\powershell\Get-LlmModels.ps1 -Probe
 .\powershell\Invoke-LlmPrompt.ps1 "Merhaba, kendini tanıt"
 .\powershell\Invoke-LlmPrompt.ps1 "Bir haiku yaz" -Stream
 ```
@@ -111,8 +118,12 @@ $env:LLM_MODEL    = 'mock-model'
 ### 2. Against a real endpoint
 
 ```bash
-chmod +x bash/llm-prompt.sh python/embed-test.py
+chmod +x bash/llm-prompt.sh bash/llm-models.sh python/embed-test.py
 
+# 1. confirm the model you are about to call is really there
+bash/llm-models.sh -e http://10.0.0.10:8000 -k "$MY_KEY" --has Qwen/Qwen2.5-7B-Instruct
+
+# 2. call it
 bash/llm-prompt.sh \
   -e http://10.0.0.10:8000 \
   -k "$MY_KEY" \
@@ -177,6 +188,8 @@ missing, which means a gateway that serves the API under a path prefix
 
 ## Feature matrix
 
+Chat scripts:
+
 | | `llm-prompt.sh` | `Invoke-LlmPrompt.ps1` |
 | --- | --- | --- |
 | Blocking completion | ✅ | ✅ |
@@ -187,6 +200,18 @@ missing, which means a gateway that serves the API under a path prefix
 | Usage + tok/s | ✅ `-v` | ✅ `-Verbose` |
 | Skip TLS verification | ✅ `-i` | ✅ `-Insecure` |
 | Prompt from stdin / pipe | ✅ | — (pass as argument) |
+
+Model discovery scripts:
+
+| | `llm-models.sh` | `Get-LlmModels.ps1` |
+| --- | --- | --- |
+| List ids | ✅ | ✅ |
+| Metadata table (owner, created, context) | ✅ `-l` | ✅ `-Long` |
+| Substring filter | ✅ | ✅ |
+| Assert a model is served | ✅ `--has` | ✅ `-Has` |
+| Probe every model | ✅ `--probe` | ✅ `-Probe` |
+| Raw JSON | ✅ `--json` | ✅ `-Json` |
+| Object output for further piping | — (TSV-style text) | ✅ |
 
 ## Security
 
@@ -211,9 +236,10 @@ python3 tests/smoke_test.py -v       # plus each command's output
 PASS  bash: chat (blocking)                      Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 PASS  bash: chat (streaming)                     ...
 PASS  powershell: chat (blocking)                ...
+PASS  bash: --probe reports broken models        MODEL       STATUS    LATENCY  NOTE
 PASS  python: sanity suite                       PASS  dim consistent across batch            dim=128
 ...
-19 passed, 0 failed, 0 skipped/warned
+31 passed, 0 failed, 0 skipped/warned
 ```
 
 Runtimes you do not have are reported as `SKIP`, not `FAIL`, so the same file
@@ -222,7 +248,7 @@ the cross-platform claims above are checked, not asserted.
 
 ## Roadmap
 
-- [ ] `/v1/models` discovery helper (list what a gateway actually serves)
+- [x] `/v1/models` discovery helper — [docs/models.md](docs/models.md)
 - [ ] Reranker endpoint (`/v1/rerank`) sanity checks
 - [ ] Concurrency / TTFT load-test mode for chat, not just embeddings
 - [ ] Function-calling and structured-output conformance checks

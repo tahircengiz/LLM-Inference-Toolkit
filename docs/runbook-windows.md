@@ -11,7 +11,7 @@ Linux / macOS / WSL users: see [runbook-linux.md](runbook-linux.md) instead.
 
 | Environment | PowerShell | Python | Result |
 | --- | --- | --- | --- |
-| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 11/11 (Bash tests skipped by design) |
+| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 17/17 (Bash tests skipped by design) |
 | PowerShell 7.6.3 on macOS (local) | 7.6.3 | 3.9.6 | ✅ |
 | Windows PowerShell 5.1 | 5.1 | — | ⚠️ supported, not yet covered by CI — reports welcome |
 
@@ -45,7 +45,7 @@ powershell -ExecutionPolicy Bypass -File .\powershell\Invoke-LlmPrompt.ps1 "Merh
 To run every test at once instead of one by one:
 
 ```powershell
-python tests\smoke_test.py     # expect: 11 passed, 0 failed, 1 skipped
+python tests\smoke_test.py     # expect: 17 passed, 0 failed, 1 skipped
 ```
 
 The skip is the Bash script — on Windows, use the PowerShell one.
@@ -179,6 +179,133 @@ no PowerShell exception block. Same for a missing endpoint or key.
 
 ---
 
+## Model discovery
+
+### W08 — List what the endpoint serves
+
+```powershell
+.\powershell\Get-LlmModels.ps1
+```
+
+```
+mock-model
+mock-embed
+error-503
+```
+
+**Pass:** exit `0` · one id per line, in the server's own order. The mock
+deliberately advertises three models, one of which does not work — that is what
+makes W11 reproducible.
+
+### W09 — Metadata table
+
+```powershell
+.\powershell\Get-LlmModels.ps1 -Long
+```
+
+```
+Model      Owner Created              Context
+-----      ----- -------              -------
+mock-model mock  2025-01-01T00:00:00Z 8192
+mock-embed mock  2025-03-01T00:00:00Z 512
+error-503  mock  -                    -
+```
+
+**Pass:** exit `0` · timestamps in UTC ISO-8601, formatted with
+`InvariantCulture` so a tr-TR host prints the same string · `-` wherever the
+server publishes nothing.
+**Varies:** nothing. This output is byte-identical on every machine.
+
+`-Long` emits **objects**, so discovery composes with the rest of PowerShell:
+
+```powershell
+.\powershell\Get-LlmModels.ps1 -Long |
+    Where-Object { $_.Context -ne '-' -and [int]$_.Context -ge 1024 } |
+    Select-Object Model, Context
+```
+
+```
+Model      Context
+-----      -------
+mock-model 8192
+```
+
+### W10 — Filter by substring
+
+```powershell
+.\powershell\Get-LlmModels.ps1 mock-embed
+```
+
+```
+mock-embed
+```
+
+**Pass:** exit `0` · case-insensitive match on the id · exit `1` with
+`no model matches <pattern>` when nothing matches.
+
+### W11 — Probe: which models actually answer?
+
+```powershell
+pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Probe
+$LASTEXITCODE
+```
+
+```
+Model      Status Ms Note
+-----      ------ -- ----
+mock-model ok      3
+mock-embed 400     5 this model does not support chat completions
+error-503  503     1 injected error for model 'error-503'
+1/3 models answered
+1
+```
+
+**Pass:** exit `1` — because one advertised model fails, which is the point of
+the test · every model gets a row · the `Note` column carries the **server's
+own** error message · the `n/n models answered` summary goes to stderr, so the
+table itself stays clean when redirected.
+**Varies:** the `Ms` column.
+
+A `400` on an embedding model is correct behaviour, not a fault. Each probe is a
+real `max_tokens: 1` request, so filter first on a paid gateway:
+`.\powershell\Get-LlmModels.ps1 -Probe qwen`.
+
+### W12 — Assert a model is served (CI gate)
+
+```powershell
+pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Has mock-model
+$LASTEXITCODE
+pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Has no-such-model
+$LASTEXITCODE
+```
+
+```
+0
+model 'no-such-model' is not served by http://127.0.0.1:8899/v1/models
+1
+```
+
+**Pass:** silent success, one stderr line and exit `1` on a miss. Matching is
+exact and case-sensitive — the same way the server matches.
+
+### W13 — Raw JSON
+
+```powershell
+.\powershell\Get-LlmModels.ps1 -Json | ConvertFrom-Json | Select-Object -ExpandProperty data | Select-Object -First 1
+```
+
+```
+id            : mock-model
+object        : model
+created       : 1735689600
+owned_by      : mock
+max_model_len : 8192
+```
+
+**Pass:** exit `0` · valid JSON straight from the server.
+
+---
+
 ## Embeddings
 
 The embeddings script is Python and behaves identically on every OS. Use
@@ -216,7 +343,7 @@ $env:LLM_MODEL       = 'Qwen/Qwen2.5-7B-Instruct'
 $env:LLM_EMBED_MODEL = 'BAAI/bge-m3'
 ```
 
-Then re-run W01–W07. Expectations are the same as the Linux runbook's
+Then re-run W01–W13. Expectations are the same as the Linux runbook's
 [real-endpoint table](runbook-linux.md#against-a-real-endpoint).
 
 Windows-specific things to watch for:
