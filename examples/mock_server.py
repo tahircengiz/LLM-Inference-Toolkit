@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 """
-Minimal OpenAI-compatible mock server - stdlib only.
+Minimal OpenAI uyumlu sahte (mock) sunucu - sadece standart kütüphane.
 
-Lets you try every script in this repo (and run the smoke tests) without a GPU,
-a model, or network access. It implements just enough of the API surface the
-scripts touch:
+GPU, model ya da ağ erişimi olmadan bu depodaki her betiği denemenizi (ve smoke
+testlerini çalıştırmanızı) sağlar. Betiklerin dokunduğu API yüzeyinin yalnızca
+gerekli kadarını uygular:
 
-    GET  /v1/models                (three models, one deliberately broken)
-    POST /v1/chat/completions      (blocking and stream=true / SSE)
-    POST /v1/embeddings            (float and base64 encoding_format)
+    GET  /v1/models                (üç model, biri bilerek bozuk)
+    POST /v1/chat/completions      (bloklayan ve stream=true / SSE)
+    POST /v1/embeddings            (float ve base64 encoding_format)
 
-Any request whose model name looks like "error-404" is answered with that HTTP
-status, so the failure paths of the scripts can be tested reproducibly.
+Model adı "error-404" gibi olan her istek o HTTP status'u ile yanıtlanır; böylece
+betiklerin hata yolları tekrarlanabilir şekilde test edilebilir.
 
-Embeddings are deterministic word + character-trigram hashes, L2-normalized, so the
-sanity suite in python/embed-test.py behaves like it would against a real
-model: identical texts match exactly, paraphrases score higher than unrelated
-text, and batch position never changes a vector.
+Embedding'ler deterministik kelime + karakter-trigram hash'leridir ve
+L2-normalize edilir. Böylece python/embed-test.py içindeki sağlık paketi gerçek
+bir modeldeki gibi davranır: aynı metinler birebir eşleşir, paraphrase alakasız
+metinden yüksek skor alır ve batch pozisyonu vektörü değiştirmez.
+
+Not: gerçek sunucular hata mesajlarını İngilizce döndürür; buradaki Türkçe
+mesajlar yalnızca bu deponun diline uyması içindir - yapı (error.message /
+error.type) gerçek API ile aynıdır.
 
     python3 examples/mock_server.py --port 8899
     LLM_ENDPOINT=http://127.0.0.1:8899 LLM_API_KEY=sk-mock LLM_MODEL=mock-model \
@@ -37,14 +41,14 @@ MODEL_ID = "mock-model"
 EMBED_MODEL_ID = "mock-embed"
 BROKEN_MODEL_ID = "error-503"
 
-# Fixed timestamps so /v1/models output is byte-identical on every machine.
+# Sabit timestamp: /v1/models çıktısı her makinede byte-byte aynı olsun.
 # 1735689600 = 2025-01-01T00:00:00Z, 1740787200 = 2025-03-01T00:00:00Z
 CATALOG = [
     {"id": MODEL_ID, "object": "model", "created": 1735689600, "owned_by": "mock",
      "max_model_len": 8192},
     {"id": EMBED_MODEL_ID, "object": "model", "created": 1740787200, "owned_by": "mock",
      "max_model_len": 512},
-    # Advertised but not usable - so a probe run has a reproducible failure row.
+    # Listede var ama çalışmıyor - probe çıktısında tekrarlanabilir bir hata satırı.
     {"id": BROKEN_MODEL_ID, "object": "model", "owned_by": "mock"},
 ]
 DEFAULT_DIM = 128
@@ -52,7 +56,7 @@ REPLY = "Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇ
 
 
 # --------------------------------------------------------------------------
-# deterministic pseudo-embeddings
+# deterministik sahte embedding'ler
 # --------------------------------------------------------------------------
 
 def _bucket(feature, dim):
@@ -61,12 +65,13 @@ def _bucket(feature, dim):
 
 
 def embed_text(text, dim=DEFAULT_DIM, max_chars=8192):
-    """Word + character-trigram feature hashing, L2-normalized.
+    """Kelime + karakter-trigram feature hashing, L2-normalize.
 
-    Words carry most of the weight so that paraphrases sharing vocabulary score
-    higher than unrelated text - the property the sanity suite checks for.
+    Ağırlığın çoğunu kelimeler taşır; böylece ortak kelime içeren paraphrase
+    metinler alakasız metinden yüksek skor alır - sağlık paketinin aradığı
+    özellik budur.
     """
-    text = text[:max_chars].lower()               # simulate max-model-len truncation
+    text = text[:max_chars].lower()               # max-model-len truncation simülasyonu
     vec = [0.0] * dim
 
     words = "".join(c if c.isalnum() else " " for c in text).split()
@@ -104,10 +109,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.server.verbose:
             sys.stderr.write("[mock] %s - %s\n" % (self.address_string(), fmt % args))
 
-    # -- helpers ----------------------------------------------------------
+    # -- yardımcılar ------------------------------------------------------
     def _json(self, obj, status=200):
-        # Deliberately no charset in Content-Type: this is what trips up
-        # PowerShell 5.1, and the scripts here are expected to cope.
+        # Content-Type'ta bilerek charset yok: PowerShell 5.1'i tökezleten şey
+        # tam olarak bu ve buradaki betiklerin bununla başa çıkması bekleniyor.
         payload = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -124,7 +129,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             return json.loads(raw.decode("utf-8"))
         except ValueError:
-            self._error(400, "request body is not valid JSON")
+            self._error(400, "istek gövdesi geçerli JSON değil")
             return None
 
     def _authorized(self):
@@ -133,29 +138,29 @@ class Handler(BaseHTTPRequestHandler):
         auth = self.headers.get("Authorization", "")
         if auth.startswith("Bearer ") and auth[7:].strip():
             return True
-        self._error(401, "missing or malformed Authorization header", "authentication_error")
+        self._error(401, "Authorization başlığı eksik ya da hatalı", "authentication_error")
         return False
 
     def _maybe_injected_error(self, model):
-        """model="error-404" makes the server answer 404 - lets the scripts'
-        failure paths be tested with a reproducible, documented status."""
+        """model="error-404" sunucuyu 404 döndürmeye zorlar - betiklerin hata
+        yolları böylece tekrarlanabilir ve belgelenmiş bir status ile test edilir."""
         if not str(model).startswith("error-"):
             return False
         try:
             status = int(str(model).split("-", 1)[1])
         except ValueError:
             status = 500
-        self._error(status, "injected error for model %r" % model, "injected_error")
+        self._error(status, "%r modeli için enjekte edilmiş hata" % model, "injected_error")
         return True
 
-    # -- routes -----------------------------------------------------------
+    # -- rotalar ----------------------------------------------------------
     def do_GET(self):
         if self.path.rstrip("/").endswith("/v1/models"):
             if not self._authorized():
                 return
             self._json({"object": "list", "data": CATALOG})
         else:
-            self._error(404, "unknown route %s" % self.path, "not_found")
+            self._error(404, "bilinmeyen rota %s" % self.path, "not_found")
 
     def do_POST(self):
         if self.path.endswith("/chat/completions"):
@@ -163,8 +168,8 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.endswith("/embeddings"):
             self._embeddings()
         else:
-            self._error(404, "unknown route %s (expected /v1/chat/completions "
-                             "or /v1/embeddings)" % self.path, "not_found")
+            self._error(404, "bilinmeyen rota %s (/v1/chat/completions ya da "
+                             "/v1/embeddings bekleniyordu)" % self.path, "not_found")
 
     def _chat(self):
         if not self._authorized():
@@ -173,17 +178,17 @@ class Handler(BaseHTTPRequestHandler):
         if body is None:
             return
         if not body.get("model"):
-            self._error(400, "'model' is a required property")
+            self._error(400, "'model' zorunlu bir alan")
             return
         if self._maybe_injected_error(body["model"]):
             return
         if body["model"] == EMBED_MODEL_ID:
-            self._error(400, "this model does not support chat completions",
+            self._error(400, "bu model chat completions desteklemiyor",
                         "invalid_request_error")
             return
         messages = body.get("messages") or []
         if not messages:
-            self._error(400, "'messages' must contain at least one item")
+            self._error(400, "'messages' en az bir eleman içermeli")
             return
 
         prompt_tokens = sum(rough_tokens(str(m.get("content", ""))) for m in messages)
@@ -194,6 +199,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "close")
             self.end_headers()
+            # Prefill simülasyonu: ilk token'dan önce üç chunk gecikmesi kadar
+            # bekle; böylece TTFT ile ITL ayrı ve doğrulanabilir sayılar olur.
+            chunk_delay = self.server.delay or 0.02
+            time.sleep(chunk_delay * 3)
             for piece in REPLY.split(" "):
                 chunk = {"id": "chatcmpl-mock", "object": "chat.completion.chunk",
                          "model": body["model"],
@@ -202,7 +211,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(("data: %s\n\n" % json.dumps(chunk, ensure_ascii=False))
                                  .encode("utf-8"))
                 self.wfile.flush()
-                time.sleep(self.server.delay or 0.02)
+                time.sleep(chunk_delay)
             done = {"id": "chatcmpl-mock", "object": "chat.completion.chunk",
                     "model": body["model"],
                     "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
@@ -230,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
         if body is None:
             return
         if not body.get("model"):
-            self._error(400, "'model' is a required property")
+            self._error(400, "'model' zorunlu bir alan")
             return
         if self._maybe_injected_error(body["model"]):
             return
@@ -238,7 +247,7 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(texts, str):
             texts = [texts]
         if not texts:
-            self._error(400, "'input' must be a string or a non-empty array")
+            self._error(400, "'input' bir string ya da boş olmayan bir dizi olmalı")
             return
 
         dim = int(body.get("dimensions") or DEFAULT_DIM)
@@ -265,22 +274,22 @@ def build_server(host="127.0.0.1", port=8899, require_key=True, delay=0.0, verbo
 
 
 def main():
-    p = argparse.ArgumentParser(description="OpenAI-compatible mock server")
+    p = argparse.ArgumentParser(description="OpenAI uyumlu sahte sunucu")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8899)
     p.add_argument("--delay", type=float, default=0.0,
-                   help="artificial per-response latency in seconds")
-    p.add_argument("--no-auth", action="store_true", help="accept requests without a key")
+                   help="yanıt başına yapay gecikme (saniye)")
+    p.add_argument("--no-auth", action="store_true", help="anahtarsız istekleri kabul et")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()
 
     srv = build_server(args.host, args.port, not args.no_auth, args.delay, args.verbose)
-    print("mock OpenAI-compatible server on http://%s:%d/v1  (model: %s, Ctrl-C to stop)"
+    print("OpenAI uyumlu sahte sunucu: http://%s:%d/v1  (model: %s, durdurmak için Ctrl-C)"
           % (args.host, args.port, MODEL_ID))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        print("\nbye")
+        print("\ngörüşürüz")
     finally:
         srv.server_close()
 

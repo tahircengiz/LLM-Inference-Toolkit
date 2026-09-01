@@ -1,61 +1,61 @@
 # Chat completions
 
-Two scripts, one job: send a prompt to `/v1/chat/completions` and show you
-exactly what came back.
+İki betik, tek iş: `/v1/chat/completions` adresine bir prompt gönderip ne
+döndüğünü tam olarak göstermek.
 
 | | Linux / macOS / WSL | Windows |
 | --- | --- | --- |
-| Script | [`bash/llm-prompt.sh`](../bash/llm-prompt.sh) | [`powershell/Invoke-LlmPrompt.ps1`](../powershell/Invoke-LlmPrompt.ps1) |
-| Needs | `curl` + (`jq` or `python3`) | nothing beyond PowerShell 5.1 |
+| Betik | [`bash/llm-prompt.sh`](../bash/llm-prompt.sh) | [`powershell/Invoke-LlmPrompt.ps1`](../powershell/Invoke-LlmPrompt.ps1) |
+| Gerekenler | `curl` + (`jq` ya da `python3`) | PowerShell 5.1 dışında hiçbir şey |
 
-Both accept the same endpoint forms, read the same environment variables, and
-print the assistant message on **stdout** with diagnostics on **stderr** — so
-`llm-prompt.sh "..." > answer.txt` gives you a clean file even with `-v` on.
+İkisi de aynı endpoint biçimlerini kabul eder, aynı ortam değişkenlerini okur ve
+asistan mesajını **stdout**'a, tanılamayı **stderr**'e yazar — yani
+`llm-prompt.sh "..." > yanit.txt` komutu `-v` açıkken bile temiz bir dosya verir.
 
 ---
 
 ## `bash/llm-prompt.sh`
 
 ```
-Usage: llm-prompt.sh [options] "prompt"
+Kullanim: llm-prompt.sh [secenekler] "prompt"
 
-  -e, --endpoint URL     Base URL, .../v1 or full .../v1/chat/completions
+  -e, --endpoint URL     Temel URL, .../v1 ya da tam .../v1/chat/completions
                          (env: LLM_ENDPOINT)
   -k, --api-key KEY      Bearer token (env: LLM_API_KEY)
-  -m, --model NAME       Model name (env: LLM_MODEL)
-  -s, --system TEXT      System prompt
-  -t, --temperature N    Default 0.0
-  -n, --max-tokens N     Default 512
-      --timeout N        Total request timeout in seconds, default 300
-      --stream           Stream tokens as they arrive (SSE)
-      --raw              Print the full JSON response
-  -i, --insecure         Skip TLS verification (self-signed endpoints)
-  -v, --verbose          Print token usage, latency and tok/s to stderr
-  -h, --help             This text
+  -m, --model AD         Model adi (env: LLM_MODEL)
+  -s, --system METIN     System prompt
+  -t, --temperature N    Varsayilan 0.0
+  -n, --max-tokens N     Varsayilan 512
+      --timeout N        Toplam istek zaman asimi (saniye), varsayilan 300
+      --stream           Token'lari geldikce yazdir (SSE)
+      --raw              Tam JSON yanitini yazdir
+  -i, --insecure         TLS dogrulamasini atla (self-signed endpoint)
+  -v, --verbose          Token kullanimi, gecikme ve tok/s bilgisini stderr'e yaz
+  -h, --help             Bu metin
 ```
 
-The prompt can come from an argument, a pipe, or a heredoc:
+Prompt parametre, pipe ya da dosya olarak verilebilir:
 
 ```bash
 llm-prompt.sh "Merhaba"
 echo "Merhaba" | llm-prompt.sh
 llm-prompt.sh < prompt.txt
-llm-prompt.sh -- "--this-starts-with-dashes"
+llm-prompt.sh -- "--tire-ile-baslayan-bir-metin"
 ```
 
-### Portability
+### Taşınabilirlik
 
-The script targets **Bash 3.2**, which is what ships on macOS, and avoids
-GNU-only behaviour so the same file works on a BusyBox container, a BSD box or
-WSL:
+Betik **Bash 3.2**'yi hedefler (macOS'un getirdiği sürüm) ve GNU'ya özel
+davranışlardan kaçınır; böylece aynı dosya BusyBox container'ında, BSD makinede
+ya da WSL'de de çalışır:
 
-- Elapsed time comes from `$EPOCHREALTIME` (Bash 5), then GNU `date +%s%N`,
-  then `python3`, then whole seconds — never a raw `%N` that BSD `date` leaves
-  unexpanded.
-- The SSE stream is split with `awk` + `fflush()` rather than
-  `grep --line-buffered | sed -u`, which do not exist outside GNU userland.
-- `jq` is used when present; otherwise `python3` builds the request body and
-  parses the response. You need one of the two, not both.
+- Geçen süre önce `$EPOCHREALTIME` (Bash 5), sonra GNU `date +%s%N`, sonra
+  `python3`, en sonda tam saniye üzerinden hesaplanır — BSD `date`'in çözemediği
+  ham `%N` asla çıktıya sızmaz.
+- SSE akışı `grep --line-buffered | sed -u` yerine `awk` + `fflush()` ile
+  ayrıştırılır; bu GNU parametreleri GNU dışı sistemlerde yoktur.
+- `jq` varsa kullanılır, yoksa istek gövdesini kuran ve yanıtı ayrıştıran
+  `python3`'e düşülür. İkisinden biri yeterlidir.
 
 ---
 
@@ -69,107 +69,105 @@ WSL:
                        [-Stream] [-Raw] [-Insecure] [-Verbose]
 ```
 
-Windows PowerShell 5.1 breaks OpenAI-compatible calls in two specific ways, and
-the script handles both:
+Windows PowerShell 5.1, OpenAI uyumlu çağrıları iki noktada bozar; betik ikisini
+de ele alır:
 
-1. **TLS.** 5.1 negotiates SSL3/TLS1.0 on some hosts. The script ORs TLS 1.2
-   into `ServicePointManager.SecurityProtocol` before the first request.
-2. **Encoding.** 5.1 sends the body as ISO-8859-1 and decodes a response
-   without an explicit `charset` the same way — which turns *Türkçe* into
-   *TÃ¼rkÃ§e*. The script sends `[Text.Encoding]::UTF8.GetBytes(...)` and
-   decodes `RawContentStream` as UTF-8 explicitly.
+1. **TLS.** 5.1 bazı makinelerde SSL3/TLS1.0 ile anlaşmaya çalışır. Betik ilk
+   istekten önce `ServicePointManager.SecurityProtocol` değerine TLS 1.2 ekler.
+2. **Kodlama.** 5.1 gövdeyi ISO-8859-1 olarak gönderir ve `charset` belirtmeyen
+   bir yanıtı da aynı şekilde çözer — *Türkçe* böylece *TÃ¼rkÃ§e* olur. Betik
+   `[Text.Encoding]::UTF8.GetBytes(...)` ile gönderir ve `RawContentStream`'i
+   açıkça UTF-8 olarak çözer.
 
-`-Insecure` maps to a `ServerCertificateValidationCallback` on 5.1 and to
-`-SkipCertificateCheck` (or the HttpClient validator, when streaming) on 7+.
+`-Insecure`, 5.1'de `ServerCertificateValidationCallback`'e, 7+ sürümlerinde
+`-SkipCertificateCheck`'e (streaming sırasında HttpClient doğrulayıcısına) karşılık gelir.
 
-> **Note** — streaming uses `HttpClient` because `Invoke-WebRequest` buffers the
-> whole response before returning. It is verified in CI on PowerShell 7
-> (Ubuntu, macOS, Windows); 5.1 support is best-effort and loads
-> `System.Net.Http` on demand.
+> **Not** — streaming `HttpClient` kullanır, çünkü `Invoke-WebRequest` yanıtın
+> tamamını tamponlayıp öyle döner. CI'da PowerShell 7 üzerinde (Ubuntu, macOS,
+> Windows) doğrulanıyor; 5.1 desteği elden geldiğince sağlanmıştır ve
+> `System.Net.Http` gerektiğinde yüklenir.
+
+`.ps1` dosyaları UTF-8 **BOM** ile saklanır: 5.1, BOM olmadan dosyayı sistem kod
+sayfasıyla okur ve kaynaktaki Türkçe metinleri bozar.
 
 ---
 
-## Reading `-v` / `-Verbose` output
+## `-v` / `-Verbose` çıktısını okumak
 
 ```
 prompt=14 completion=128 total=142 | 2.31s | 55.4 tok/s | finish=stop
 ```
 
-| Field | Meaning |
+| Alan | Anlamı |
 | --- | --- |
-| `prompt` / `completion` / `total` | Token counts reported by the server in `usage` |
-| `2.31s` | **Client-side wall clock**: queueing + prefill + decode + network |
-| `55.4 tok/s` | `completion_tokens ÷ wall clock` |
-| `finish` | `stop` = model ended on its own · `length` = hit `max_tokens` · `content_filter` = blocked upstream |
+| `prompt` / `completion` / `total` | Sunucunun `usage` alanında bildirdiği token sayıları |
+| `2.31s` | **İstemci tarafı duvar saati**: kuyruk + prefill + decode + ağ |
+| `55.4 tok/s` | `completion_tokens ÷ geçen süre` |
+| `finish` | `stop` = model kendi bitirdi · `length` = `max_tokens`'a çarptı · `content_filter` = yukarıda engellendi |
 
-Two honest caveats:
+İki dürüst uyarı:
 
-- **This is not a benchmark.** The number includes network round-trip and any
-  time the request spent queued behind other requests. For real serving
-  numbers use the server's own metrics (vLLM exposes `/metrics`) or a load
-  generator that reports TTFT and inter-token latency separately.
-- **Streaming mode prints no usage.** Most servers omit `usage` from SSE chunks
-  unless you ask for `stream_options: {"include_usage": true}`, which these
-  scripts do not send. Use blocking mode when you want the token counts.
+- **Bu bir benchmark değildir.** Sayı, ağ gidiş-dönüşünü ve isteğin başka
+  isteklerin arkasında kuyrukta beklediği süreyi içerir. Yük altındaki gerçek
+  rakamlar için [yük testi](loadtest.md) betiğini kullanın; o TTFT ve ITL'yi
+  ayrı ayrı ölçer.
+- **Streaming modunda token sayısı yazılmaz.** Sunucuların çoğu, istemci
+  `stream_options: {"include_usage": true}` göndermedikçe SSE chunk'larında
+  `usage` döndürmez; bu betik onu göndermez. Token muhasebesi için bloklayan
+  modu kullanın.
 
 ---
 
-## Recipes
+## Tarifler
 
-**Compare two models on the same prompt**
+**Modeli çağırmadan önce var olduğunu doğrulayın** (bkz. [models.md](models.md))
+
+```bash
+llm-models.sh --has "$LLM_MODEL" || { echo "$LLM_ENDPOINT üzerinde model yok"; exit 1; }
+llm-prompt.sh "..."
+```
+
+**İki modeli aynı prompt'la karşılaştırın**
 
 ```bash
 for m in Qwen/Qwen2.5-7B-Instruct meta-llama/Llama-3.1-8B-Instruct; do
   echo "== $m"
-  llm-prompt.sh -m "$m" -v "Explain KV cache in one sentence." 2>&1
+  llm-prompt.sh -m "$m" -v "KV cache'i tek cümleyle açıkla." 2>&1
 done
 ```
 
-**Run a prompt file and keep only the answers**
+**Bir prompt dosyasını çalıştırıp sadece yanıtları saklayın**
 
 ```bash
 while IFS= read -r p; do
   printf '%s\t%s\n' "$p" "$(llm-prompt.sh "$p")"
-done < prompts.txt > answers.tsv
+done < promptlar.txt > yanitlar.tsv
 ```
 
-**Measure cold start after a deploy** (first call loads weights)
+**Deploy sonrası soğuk başlangıcı ölçün** (ilk çağrı ağırlıkları yükler)
 
 ```bash
 time llm-prompt.sh -n 1 "hi" >/dev/null
 ```
 
-**Gate a deployment in CI** — non-zero exit on any failure
-
-```bash
-llm-prompt.sh -m "$MODEL" -n 8 "ping" | grep -qi . || { echo "empty answer"; exit 1; }
-```
-
-**Confirm the model exists before calling it** (see [models.md](models.md))
-
-```bash
-llm-models.sh --has "$LLM_MODEL" || { echo "model missing on $LLM_ENDPOINT"; exit 1; }
-llm-prompt.sh "..."
-```
-
-**Check what a gateway actually routes to**
+**Gateway'in gerçekte nereye yönlendirdiğini görün**
 
 ```bash
 llm-prompt.sh --raw "hi" | jq '{model, id, system_fingerprint}'
 ```
 
-**Deterministic re-runs** — `-t 0` is the default; note that temperature 0 is
-*not* a guarantee of identical output on batched GPU servers (see
-[compatibility](compatibility.md#what-openai-compatible-does-not-guarantee)).
+**Tekrarlanabilir üretim** — `-t 0` zaten varsayılandır; ancak temperature 0,
+batch'li GPU sunucularında birebir aynı çıktının garantisi değildir
+([uyumluluk](compatibility.md#openai-uyumlu-olmak-neyi-garanti-etmez)).
 
 ---
 
-## Exit codes
+## Exit kodları
 
-| Code | Meaning |
+| Kod | Anlamı |
 | --- | --- |
-| `0` | Success — the assistant message was printed |
-| `1` | Missing/invalid arguments, transport failure, non-2xx HTTP status, or an unparsable body |
+| `0` | Başarılı — asistan mesajı yazıldı |
+| `1` | Eksik/geçersiz parametre, bağlantı hatası, 2xx olmayan HTTP status ya da ayrıştırılamayan gövde |
 
-The full response body is printed to stderr on a non-2xx status, so you see the
-server's own error message rather than just the code.
+2xx olmayan durumlarda yanıt gövdesi olduğu gibi stderr'e yazılır; yani sadece
+kodu değil, sunucunun kendi hata mesajını da görürsünüz.

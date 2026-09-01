@@ -1,25 +1,25 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    Discover what an OpenAI-compatible endpoint actually serves: list
-    /v1/models, filter it, assert a model is present, and optionally probe each
-    one with a single-token request to see which are really usable.
+    OpenAI uyumlu bir endpoint'in gerçekte ne servis ettiğini gösterir:
+    /v1/models listeler, filtreler, bir modelin varlığını doğrular ve isteğe
+    bağlı olarak her modele tek token'lık istek atıp hangisinin çalıştığını ölçer.
 
 .DESCRIPTION
-    The PowerShell counterpart of bash/llm-models.sh. Uses .NET only - no
-    curl.exe - and emits objects, so the output composes with Where-Object,
-    Sort-Object and Export-Csv instead of needing to be parsed.
+    bash/llm-models.sh betiğinin PowerShell karşılığı. Yalnızca .NET kullanır -
+    curl.exe gerekmez - ve nesne döndürür; böylece çıktı ayrıştırılmak yerine
+    Where-Object, Sort-Object ve Export-Csv ile doğrudan zincirlenebilir.
 
 .PARAMETER Pattern
-    Case-insensitive substring filter on the model id.
+    Model id'sinde büyük/küçük harf duyarsız altdizi filtresi.
 
 .PARAMETER Has
-    Exit 0 only if this exact model id is served, 1 otherwise. Quiet, like
-    "grep -q" - meant for deployment gates.
+    Yalnızca bu model id'si birebir servis ediliyorsa exit 0, aksi halde 1.
+    "grep -q" gibi sessiz çalışır - deploy kapıları için düşünülmüştür.
 
 .PARAMETER Probe
-    Send a 1-token chat request to every listed model and report which answer.
-    Exits 1 if any of them fail.
+    Listedeki her modele 1 token'lık chat isteği gönderir ve hangisinin cevap
+    verdiğini yazar. Biri bile hata verirse exit 1.
 
 .EXAMPLE
     .\Get-LlmModels.ps1
@@ -36,15 +36,15 @@ param(
     [Parameter(Position = 0)]
     [string]$Pattern,
 
-    # Base URL (http://host:8000), .../v1 or the full .../v1/models
+    # Temel URL (http://host:8000), .../v1 ya da tam .../v1/models
     [string]$Endpoint = $env:LLM_ENDPOINT,
 
     [string]$ApiKey = $env:LLM_API_KEY,
 
-    # Emit id, owner, created and context length instead of ids only
+    # Sadece id yerine id, sahip, oluşturulma ve context uzunluğunu yaz
     [switch]$Long,
 
-    # Print the raw JSON response
+    # Ham JSON yanıtını yazdır
     [switch]$Json,
 
     [string]$Has,
@@ -53,7 +53,7 @@ param(
 
     [int]$TimeoutSec = 60,
 
-    # Skip TLS certificate validation (self-signed internal endpoints)
+    # TLS sertifika doğrulamasını atla (self-signed iç endpoint'ler)
     [switch]$Insecure
 )
 
@@ -66,6 +66,16 @@ function Write-Fail {
     exit 1
 }
 
+function Expand-JsonEscapes {
+    # PowerShell 7, JSON hata gövdelerini yeniden serialize ederken ASCII dışı
+    # karakterleri \uXXXX olarak kaçırır; Türkçe mesajlar okunmaz hale gelir.
+    param([string]$Text)
+    if ($Text -and $Text -match '\\u[0-9a-fA-F]{4}') {
+        try { return [Regex]::Unescape($Text) } catch { return $Text }
+    }
+    return $Text
+}
+
 function Test-HasProperty {
     param($Object, [string]$Name)
     if ($null -eq $Object) { return $false }
@@ -75,7 +85,7 @@ function Test-HasProperty {
 $required = [ordered]@{ Endpoint = 'LLM_ENDPOINT'; ApiKey = 'LLM_API_KEY' }
 foreach ($p in $required.Keys) {
     if ([string]::IsNullOrWhiteSpace((Get-Variable $p -ValueOnly))) {
-        [Console]::Error.WriteLine("-$p is required (or set `$env:$($required[$p])).")
+        [Console]::Error.WriteLine("-$p parametresi gerekli (ya da `$env:$($required[$p]) ayarlayın).")
         exit 1
     }
 }
@@ -108,10 +118,10 @@ $common = @{
 if ($Insecure -and -not $isPS5) { $common['SkipCertificateCheck'] = $true }
 
 function Get-ErrorBody {
-    # PS 7 puts the response body in ErrorDetails; 5.1 needs the raw stream.
+    # PS 7 yanıt gövdesini ErrorDetails'e koyar; 5.1'de ham stream okunmalı.
     param($ErrorRecord)
     if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
-        return $ErrorRecord.ErrorDetails.Message
+        return Expand-JsonEscapes $ErrorRecord.ErrorDetails.Message
     }
     if ((Test-HasProperty $ErrorRecord.Exception 'Response') -and $ErrorRecord.Exception.Response) {
         try {
@@ -145,7 +155,7 @@ function Get-ApiMessage {
     return ''
 }
 
-# --- fetch ------------------------------------------------------------------
+# --- istek ------------------------------------------------------------------
 Write-Verbose "GET $modelsUri"
 try {
     $resp = Invoke-WebRequest @common -Uri $modelsUri -Method Get
@@ -154,17 +164,17 @@ catch {
     $status = Get-HttpStatus $_
     $body = Get-ErrorBody $_
     if ($status) { Write-Fail ("HTTP {0} from {1}`n{2}" -f $status, $modelsUri, $body) }
-    Write-Fail ("Request failed for {0}: {1}" -f $modelsUri, $_.Exception.Message)
+    Write-Fail ("İstek başarısız: {0} - {1}" -f $modelsUri, $_.Exception.Message)
 }
 
 $text = [Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray())
 if ($Json) { $text; exit 0 }
 
 try { $obj = $text | ConvertFrom-Json }
-catch { Write-Fail "Non-JSON response:`n$text" }
+catch { Write-Fail "JSON olmayan yanıt:`n$text" }
 
 if (-not (Test-HasProperty $obj 'data') -or -not $obj.data) {
-    Write-Fail "No 'data' array in response:`n$text"
+    Write-Fail "Yanıtta 'data' dizisi yok:`n$text"
 }
 
 $models = foreach ($m in $obj.data) {
@@ -179,10 +189,10 @@ $models = foreach ($m in $obj.data) {
     }
 
     [pscustomobject]@{
-        Model   = [string]$m.id
-        Owner   = if ((Test-HasProperty $m 'owned_by') -and $m.owned_by) { [string]$m.owned_by } else { '-' }
-        Created = $created
-        Context = $context
+        Model       = [string]$m.id
+        Sahip       = if ((Test-HasProperty $m 'owned_by') -and $m.owned_by) { [string]$m.owned_by } else { '-' }
+        Olusturulma = $created
+        Context     = $context
     }
 }
 
@@ -193,14 +203,14 @@ if ($Pattern) {
 # --- -Has -------------------------------------------------------------------
 if ($Has) {
     if ($models | Where-Object { $_.Model -ceq $Has }) { exit 0 }
-    Write-Fail ("model '{0}' is not served by {1}" -f $Has, $modelsUri)
+    Write-Fail ("'{0}' modeli {1} tarafından servis edilmiyor" -f $Has, $modelsUri)
 }
 
 if (-not $models -or $models.Count -eq 0) {
-    Write-Fail ("no model matches {0}" -f $Pattern)
+    Write-Fail ("'{0}' desenine uyan model yok" -f $Pattern)
 }
 
-# --- -Probe -----------------------------------------------------------------
+# --- -Probe (model yoklama) -------------------------------------------------
 if ($Probe) {
     $failed = 0
     $results = foreach ($m in $models) {
@@ -218,7 +228,7 @@ if ($Probe) {
                 -Body ([Text.Encoding]::UTF8.GetBytes($payload))
             $sw.Stop()
             [pscustomobject]@{ Model = $m.Model; Status = 'ok'
-                               Ms = [int]$sw.Elapsed.TotalMilliseconds; Note = '' }
+                               Ms = [int]$sw.Elapsed.TotalMilliseconds; Not = '' }
         }
         catch {
             $sw.Stop()
@@ -230,16 +240,16 @@ if ($Probe) {
                 Model  = $m.Model
                 Status = if ($status) { [string]$status } else { '-' }
                 Ms     = [int]$sw.Elapsed.TotalMilliseconds
-                Note   = $note
+                Not    = $note
             }
         }
     }
 
     $results | Format-Table -AutoSize | Out-String | ForEach-Object { $_.TrimEnd() } | Write-Output
-    [Console]::Error.WriteLine(("{0}/{1} models answered" -f ($models.Count - $failed), $models.Count))
+    [Console]::Error.WriteLine(("{0}/{1} model cevap verdi" -f ($models.Count - $failed), $models.Count))
     if ($failed -gt 0) { exit 1 }
     exit 0
 }
 
-# --- list -------------------------------------------------------------------
+# --- listeleme --------------------------------------------------------------
 if ($Long) { $models } else { $models | ForEach-Object { $_.Model } }

@@ -27,15 +27,15 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Toolchain
+      - name: Araç sürümleri
         shell: bash
         run: |
           python --version
           curl --version | head -1 || true
-          jq --version || echo "jq not installed - python3 fallback will be used"
-          pwsh --version || echo "pwsh not installed - PowerShell checks will be skipped"
+          jq --version || echo "jq yok - python3 yedegi kullanilacak"
+          pwsh --version || echo "pwsh yok - PowerShell kontrolleri atlanacak"
 
-      - name: Run every script against the mock server
+      - name: Her betigi sahte sunucuya karsi calistir
         run: python tests/smoke_test.py -v
 
   lint:
@@ -56,10 +56,10 @@ jobs:
           shellcheck --version
           shellcheck --severity=error bash/llm-prompt.sh
 
-      - name: Bash syntax
+      - name: Bash sozdizimi
         run: bash -n bash/llm-prompt.sh
 
-      - name: Python compile
+      - name: Python derleme
         run: python -m compileall -q python examples tests
 
       - name: PSScriptAnalyzer
@@ -69,4 +69,4 @@ jobs:
           Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
           $findings = Invoke-ScriptAnalyzer -Path powershell -Recurse -Severity Error
           if ($findings) { $findings | Format-Table -AutoSize; exit 1 }
-          Write-Host "PSScriptAnalyzer: no errors"
+          Write-Host "PSScriptAnalyzer: hata yok"

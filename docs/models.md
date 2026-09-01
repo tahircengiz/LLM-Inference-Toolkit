@@ -1,37 +1,37 @@
-# Model discovery — `/v1/models`
+# Model keşfi — `/v1/models`
 
-`GET /v1/models` is the cheapest question you can ask an inference endpoint,
-and the answer settles most "why doesn't this work" tickets before they start:
-*is the thing I am about to call actually there, and does it answer?*
+`GET /v1/models`, bir inference endpoint'ine sorabileceğiniz en ucuz sorudur ve
+"neden çalışmıyor" ticket'larının çoğunu daha açılmadan kapatır: *çağırmak
+üzere olduğum şey gerçekten orada mı ve cevap veriyor mu?*
 
 | | Linux / macOS / WSL | Windows |
 | --- | --- | --- |
-| Script | [`bash/llm-models.sh`](../bash/llm-models.sh) | [`powershell/Get-LlmModels.ps1`](../powershell/Get-LlmModels.ps1) |
-| Needs | `curl` + (`jq` or `python3`) | nothing beyond PowerShell 5.1 |
+| Betik | [`bash/llm-models.sh`](../bash/llm-models.sh) | [`powershell/Get-LlmModels.ps1`](../powershell/Get-LlmModels.ps1) |
+| Gerekenler | `curl` + (`jq` ya da `python3`) | PowerShell 5.1 dışında hiçbir şey |
 
-Both take the same endpoint forms as the chat scripts, share `LLM_ENDPOINT` /
-`LLM_API_KEY`, and **exit with the same codes** for the same conditions.
+İkisi de chat betikleriyle aynı endpoint biçimlerini kabul eder, aynı
+`LLM_ENDPOINT` / `LLM_API_KEY` değişkenlerini okur ve aynı durumlarda **aynı exit
+kodunu** verir.
 
 ---
 
 ## `bash/llm-models.sh`
 
 ```
-Usage: llm-models.sh [options] [pattern]
+Kullanim: llm-models.sh [secenekler] [desen]
 
-  pattern                Case-insensitive substring filter on the model id
+  desen                  Model id'sinde buyuk/kucuk harf duyarsiz altdizi filtresi
 
-  -e, --endpoint URL     Base URL, .../v1 or full .../v1/models
+  -e, --endpoint URL     Temel URL, .../v1 ya da tam .../v1/models
   -k, --api-key KEY      Bearer token
-  -l, --long             Table: id, owned_by, created, context length
-      --json             Print the raw JSON response
-      --has MODEL        Exit 0 only if MODEL is served exactly (quiet, like grep -q)
-      --probe            Send a 1-token chat request to every listed model and
-                         report which ones answer. Exits 1 if any fail
-      --timeout N        Request timeout in seconds, default 60
-  -i, --insecure         Skip TLS verification
-  -v, --verbose          Print the request URL to stderr
-  -h, --help             This text
+  -l, --long             Tablo: id, owned_by, created, context uzunlugu
+      --json             Ham JSON yanitini yazdir
+      --has MODEL        Yalnizca MODEL birebir servis ediliyorsa exit 0
+      --probe            Listedeki her modele 1 token'lik chat istegi gonderir
+      --timeout N        Istek zaman asimi (saniye), varsayilan 60
+  -i, --insecure         TLS dogrulamasini atla
+  -v, --verbose          Istek URL'sini stderr'e yaz
+  -h, --help             Bu metin
 ```
 
 ## `powershell/Get-LlmModels.ps1`
@@ -43,101 +43,102 @@ Usage: llm-models.sh [options] [pattern]
                     [-TimeoutSec <int>] [-Insecure] [-Verbose]
 ```
 
-The PowerShell version emits **objects**, not text, so discovery composes with
-the rest of the shell:
+PowerShell sürümü metin değil **nesne** döndürür; keşif böylece kabuğun geri
+kalanıyla zincirlenir:
 
 ```powershell
 .\powershell\Get-LlmModels.ps1 -Long | Where-Object { $_.Context -ne '-' -and [int]$_.Context -ge 1024 }
-.\powershell\Get-LlmModels.ps1 -Long | Export-Csv models.csv -NoTypeInformation
+.\powershell\Get-LlmModels.ps1 -Long | Export-Csv modeller.csv -NoTypeInformation
 ```
 
 ---
 
-## The four things it answers
+## Yanıtladığı dört soru
 
-### 1. What is served?
+### 1. Ne servis ediliyor?
 
 ```bash
-llm-models.sh          # ids, one per line - pipeable
-llm-models.sh -l       # id, owner, created, context length
+llm-models.sh          # id'ler, satır başına bir tane - pipe'lanabilir
+llm-models.sh -l       # id, sahip, oluşturulma, context uzunluğu
 ```
 
-The context column reads `max_model_len` (vLLM), then `context_length`, then
-`max_input_tokens`, and shows `-` when the server publishes none of them.
-Knowing it up front is what stops a 400 halfway through an ingestion run.
+Context sütunu sırasıyla `max_model_len` (vLLM), `context_length` ve
+`max_input_tokens` alanlarını okur; hiçbiri yayınlanmıyorsa `-` gösterir. Bunu
+baştan bilmek, bir ingestion koşusunun yarısında 400 almanızı engeller.
 
-### 2. Is *my* model served? (deployment gate)
+### 2. *Benim* modelim servis ediliyor mu? (deploy kapısı)
 
 ```bash
 llm-models.sh --has "Qwen/Qwen2.5-7B-Instruct" || {
-    echo "model missing on $LLM_ENDPOINT"; exit 1
+    echo "$LLM_ENDPOINT üzerinde model yok"; exit 1
 }
 ```
 
-Quiet on success, one line to stderr and exit 1 on failure — the same shape as
-`grep -q`, so it drops straight into CI. Matching is **exact and
-case-sensitive**, because that is how the server matches it too.
+Başarıda sessizdir, hatada stderr'e tek satır yazıp exit 1 verir — tam olarak
+`grep -q` biçimi, yani doğrudan CI'ya girer. Eşleşme **birebir ve büyük/küçük
+harf duyarlıdır**, çünkü sunucu da öyle eşleştirir.
 
-### 3. Which of them actually answer?
+### 3. Hangileri gerçekten cevap veriyor?
 
 ```bash
 llm-models.sh --probe
 ```
 
 ```
-MODEL       STATUS    LATENCY  NOTE
+MODEL       STATUS    LATENCY  NOT
 mock-model  ok           16ms
-mock-embed  400          17ms  this model does not support chat completions
-error-503   503          17ms  injected error for model 'error-503'
+mock-embed  400          17ms  bu model chat completions desteklemiyor
+error-503   503          17ms  'error-503' modeli için enjekte edilmiş hata
 
-1/3 models answered
+1/3 model cevap verdi
 ```
 
-A listing is a claim, not a guarantee. Gateways routinely advertise models that
-are unrouted, mis-keyed, or not chat models at all. `--probe` sends one
-`max_tokens: 1` request per model and prints what came back — exiting 1 if any
-of them failed, so it works as a post-deploy check.
+Listeleme bir iddiadır, garanti değil. Gateway'ler rutin olarak route edilmemiş,
+anahtarı yanlış ya da zaten chat modeli olmayan model adları yayınlar. `--probe`
+her modele `max_tokens: 1` ile bir istek atıp ne döndüğünü yazar; biri bile hata
+verirse exit 1 olur, yani deploy sonrası kontrol olarak kullanılabilir.
 
-Two things to keep in mind:
+İki nokta:
 
-- **It costs tokens.** One tiny request per model, but against a paid gateway
-  with 50 aliases that is 50 billable calls. Filter first: `llm-models.sh --probe qwen`.
-- **A 400 is not always a fault.** Embedding and reranker models legitimately
-  reject chat requests; the NOTE column carries the server's own explanation so
-  you can tell the two apart.
+- **Token harcar.** Model başına küçücük bir istek, ama 50 alias'lı ücretli bir
+  gateway'de 50 faturalı çağrı demektir. Önce filtreleyin:
+  `llm-models.sh --probe qwen`.
+- **400 her zaman arıza değildir.** Embedding ve reranker modelleri chat
+  isteklerini haklı olarak reddeder; NOT sütunu sunucunun kendi açıklamasını
+  taşır, ikisini oradan ayırt edersiniz.
 
-### 4. What does the raw payload look like?
+### 4. Ham yanıt neye benziyor?
 
 ```bash
 llm-models.sh --json | jq '.data[0]'
 ```
 
-Useful when a server publishes extra fields — vLLM adds `max_model_len` and
-`permission`, some gateways add routing metadata.
+Sunucu ek alanlar yayınlıyorsa işe yarar — vLLM `max_model_len` ve `permission`
+ekler, bazı gateway'ler yönlendirme bilgisi koyar.
 
 ---
 
-## Exit codes
+## Exit kodları
 
-Identical in both scripts:
+İki betikte de aynı:
 
-| Code | Meaning |
+| Kod | Anlamı |
 | --- | --- |
-| `0` | Listed successfully · `--has` found the model · `--probe` and every model answered |
-| `1` | Missing arguments, transport failure, non-2xx status, unparsable body, no model matched the filter, `--has` miss, or `--probe` with at least one failure |
+| `0` | Listeleme başarılı · `--has` modeli buldu · `--probe` ve tüm modeller cevap verdi |
+| `1` | Eksik parametre, bağlantı hatası, 2xx olmayan status, ayrıştırılamayan gövde, filtreye uyan model yok, `--has` bulamadı ya da `--probe` en az bir hata gördü |
 
 ---
 
-## Backend notes
+## Backend notları
 
-| Backend | What `/v1/models` returns |
+| Backend | `/v1/models` ne döndürür |
 | --- | --- |
-| **vLLM** | The served model with `max_model_len` — the fastest way to confirm `--served-model-name` |
-| **llama.cpp** (`llama-server`) | Its single loaded model. Chat ignores the `model` field entirely, so `--has` is more informative than a chat call |
-| **Ollama** | The pulled tags (`llama3.1:8b`). Any bearer token is accepted, but one must be sent |
-| **TGI** | Often a single entry named `tgi` |
-| **LiteLLM / gateways** | Your virtual aliases, not the upstream model names. `--probe` is worth running here: an alias can exist in the list and still be unrouted |
-| **OpenAI** | The full catalogue your key can see — expect a long list, so filter |
+| **vLLM** | Servis edilen model ve `max_model_len` — `--served-model-name` doğru mu, en hızlı buradan görülür |
+| **llama.cpp** (`llama-server`) | Yüklü tek model. Chat isteğinde `model` alanı tamamen yok sayıldığı için `--has` chat çağrısından daha bilgilendiricidir |
+| **Ollama** | Çekilmiş tag'ler (`llama3.1:8b`). Herhangi bir bearer token kabul edilir ama gönderilmesi gerekir |
+| **TGI** | Çoğunlukla `tgi` adında tek kayıt |
+| **LiteLLM / gateway'ler** | Upstream model adları değil, sizin sanal alias'larınız. Bir alias listede olup route edilmemiş olabilir — `--probe` tam da bunu yakalar |
+| **OpenAI** | Anahtarınızın görebildiği tüm katalog; uzun olur, önce filtreleyin |
 
-Verified command-and-output pairs live in the runbooks:
-[Linux](runbook-linux.md#model-discovery) · [Windows](runbook-windows.md#model-discovery).
+Doğrulanmış komut–çıktı çiftleri runbook'larda:
+[Linux](runbook-linux.md#model-keşfi) · [Windows](runbook-windows.md#model-keşfi).

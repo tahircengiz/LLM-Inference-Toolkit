@@ -1,22 +1,22 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 .SYNOPSIS
-    Sends a single prompt to an OpenAI-compatible /v1/chat/completions endpoint
-    (vLLM, TGI-OpenAI shim, llama.cpp server, Ollama, OpenAI, Azure-compatible
-    gateways) using .NET only - no curl / curl.exe dependency.
+    OpenAI uyumlu bir /v1/chat/completions endpoint'ine tek prompt gönderir
+    (vLLM, TGI-OpenAI shim, llama.cpp server, Ollama, OpenAI, Azure uyumlu
+    gateway'ler). Yalnızca .NET kullanır - curl / curl.exe gerekmez.
 
 .DESCRIPTION
-    The PowerShell counterpart of bash/llm-prompt.sh. Handles the two things
-    that usually break on Windows PowerShell 5.1: TLS 1.2 negotiation and UTF-8
-    request/response encoding (Turkish characters).
+    bash/llm-prompt.sh betiğinin PowerShell karşılığı. Windows PowerShell 5.1
+    üzerinde işleri bozan iki şeyi çözer: TLS 1.2 anlaşması ve istek/yanıtın
+    UTF-8 kodlaması (Türkçe karakterler).
 
 .PARAMETER Endpoint
-    Base URL (http://host:8000), .../v1, or the full .../v1/chat/completions.
-    Falls back to $env:LLM_ENDPOINT.
+    Temel URL (http://host:8000), .../v1 ya da tam .../v1/chat/completions.
+    Verilmezse $env:LLM_ENDPOINT kullanılır.
 
 .PARAMETER Stream
-    Stream tokens as they arrive (SSE). Uses HttpClient instead of
-    Invoke-WebRequest, which cannot read a response incrementally.
+    Token'ları geldikçe yazdırır (SSE). Invoke-WebRequest yanıtı parça parça
+    okuyamadığı için bu modda HttpClient kullanılır.
 
 .EXAMPLE
     .\Invoke-LlmPrompt.ps1 "Merhaba, kendini tanit" `
@@ -38,7 +38,7 @@ param(
     [Parameter(Mandatory, Position = 0)]
     [string]$Prompt,
 
-    # Base URL (http://host:8000), .../v1 or the full .../v1/chat/completions
+    # Temel URL (http://host:8000), .../v1 ya da tam .../v1/chat/completions
     [string]$Endpoint = $env:LLM_ENDPOINT,
 
     [string]$ApiKey = $env:LLM_API_KEY,
@@ -53,13 +53,13 @@ param(
 
     [int]$TimeoutSec = 300,
 
-    # Stream tokens as they arrive instead of waiting for the full answer
+    # Yanıtın tamamını beklemek yerine token'ları geldikçe yazdır
     [switch]$Stream,
 
-    # Print the full JSON response instead of just the assistant message
+    # Sadece asistan mesajı yerine tam JSON yanıtını yazdır
     [switch]$Raw,
 
-    # Skip TLS certificate validation (self-signed internal endpoints)
+    # TLS sertifika doğrulamasını atla (self-signed iç endpoint'ler)
     [switch]$Insecure
 )
 
@@ -69,7 +69,7 @@ Set-StrictMode -Version Latest
 $required = [ordered]@{ Endpoint = 'LLM_ENDPOINT'; ApiKey = 'LLM_API_KEY'; Model = 'LLM_MODEL' }
 foreach ($p in $required.Keys) {
     if ([string]::IsNullOrWhiteSpace((Get-Variable $p -ValueOnly))) {
-        [Console]::Error.WriteLine("-$p is required (or set `$env:$($required[$p])).")
+        [Console]::Error.WriteLine("-$p parametresi gerekli (ya da `$env:$($required[$p]) ayarlayın).")
         exit 1
     }
 }
@@ -83,11 +83,22 @@ function Resolve-ChatUri {
 }
 
 function Write-Fail {
-    # Bash-equivalent failure output: a plain stderr line, then exit 1. Avoids
-    # PowerShell's multi-line error block so both scripts can be diffed.
+    # Bash betiğiyle aynı hata çıktısı: düz bir stderr satırı, sonra exit 1.
+    # PowerShell'in çok satırlı hata bloğunu kullanmayız ki iki betiğin çıktısı
+    # birebir karşılaştırılabilsin.
     param([string]$Message)
     [Console]::Error.WriteLine($Message)
     exit 1
+}
+
+function Expand-JsonEscapes {
+    # PowerShell 7, JSON hata gövdelerini yeniden serialize ederken ASCII dışı
+    # karakterleri \uXXXX olarak kaçırır; Türkçe mesajlar okunmaz hale gelir.
+    param([string]$Text)
+    if ($Text -and $Text -match '\\u[0-9a-fA-F]{4}') {
+        try { return [Regex]::Unescape($Text) } catch { return $Text }
+    }
+    return $Text
 }
 
 function Test-HasProperty {
@@ -100,7 +111,7 @@ $uri = Resolve-ChatUri $Endpoint
 $isPS5 = $PSVersionTable.PSVersion.Major -lt 6
 
 if ($isPS5) {
-    # 5.1 defaults to SSL3/TLS1.0 on some hosts
+    # 5.1 bazı makinelerde SSL3/TLS1.0 ile başlar
     [Net.ServicePointManager]::SecurityProtocol =
         [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     if ($Insecure) { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } }
@@ -121,15 +132,15 @@ $payload = [ordered]@{
 }
 
 $json = $payload | ConvertTo-Json -Depth 6 -Compress
-# Send raw UTF-8 bytes: PS 5.1 would otherwise encode the body as ISO-8859-1
-# and mangle Turkish characters.
+# Ham UTF-8 byte gönder: PS 5.1 aksi halde gövdeyi ISO-8859-1 kodlar ve
+# Türkçe karakterleri bozar.
 $body = [Text.Encoding]::UTF8.GetBytes($json)
 
 Write-Verbose "POST $uri"
 Write-Verbose "Body: $json"
 
-# --- streaming path ---------------------------------------------------------
-# Invoke-WebRequest buffers the whole response, so SSE needs HttpClient.
+# --- streaming yolu ---------------------------------------------------------
+# Invoke-WebRequest yanıtın tamamını tamponlar; SSE için HttpClient gerekir.
 if ($Stream) {
     if ($isPS5) { Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue }
 
@@ -167,8 +178,8 @@ if ($Stream) {
             $data = $line.Substring(5).Trim()
             if ($data -eq '[DONE]') { break }
             try { $chunk = $data | ConvertFrom-Json } catch { continue }
-            # A usage-only or finish chunk carries no choices / an empty delta,
-            # and StrictMode turns a blind property access into a hard error.
+            # Yalnızca usage taşıyan ya da bitiş chunk'ı choices içermez veya
+            # delta'sı boştur; StrictMode böyle bir erişimi hataya çevirir.
             if (-not (Test-HasProperty $chunk 'choices')) { continue }
             foreach ($choice in $chunk.choices) {
                 if (-not (Test-HasProperty $choice 'delta')) { continue }
@@ -181,7 +192,7 @@ if ($Stream) {
         [Console]::Out.Write("`n")
     }
     catch {
-        Write-Fail ("Streaming request failed for {0}: {1}" -f $uri, $_.Exception.Message)
+        Write-Fail ("Streaming isteği başarısız: {0} - {1}" -f $uri, $_.Exception.Message)
     }
     finally {
         if ($reader) { $reader.Dispose() }
@@ -191,7 +202,7 @@ if ($Stream) {
     exit 0
 }
 
-# --- non-streaming path -----------------------------------------------------
+# --- streaming olmayan yol --------------------------------------------------
 $requestArgs = @{
     Uri             = $uri
     Method          = 'Post'
@@ -217,7 +228,7 @@ catch {
         try { $status = [int]$_.Exception.Response.StatusCode } catch { }
     }
     if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
-        $errBody = $_.ErrorDetails.Message
+        $errBody = Expand-JsonEscapes $_.ErrorDetails.Message
     }
     elseif ($isPS5 -and $_.Exception.Response) {
         $reader = New-Object IO.StreamReader($_.Exception.Response.GetResponseStream(), [Text.Encoding]::UTF8)
@@ -227,20 +238,20 @@ catch {
     if ($status) {
         Write-Fail ("HTTP {0} from {1}`n{2}" -f $status, $uri, $errBody)
     }
-    Write-Fail ("Request failed for {0}: {1}" -f $uri, $_.Exception.Message)
+    Write-Fail ("İstek başarısız: {0} - {1}" -f $uri, $_.Exception.Message)
 }
 $sw.Stop()
 
-# Decode explicitly: PS 5.1 assumes ISO-8859-1 when the server omits charset.
+# Açıkça çöz: sunucu charset göndermezse PS 5.1 ISO-8859-1 varsayar.
 $text = [Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray())
 
 if ($Raw) { $text; exit 0 }
 
 try { $obj = $text | ConvertFrom-Json }
-catch { Write-Fail "Non-JSON response:`n$text" }
+catch { Write-Fail "JSON olmayan yanıt:`n$text" }
 
 if (-not (Test-HasProperty $obj 'choices') -or -not $obj.choices) {
-    Write-Fail "Unexpected response body:`n$text"
+    Write-Fail "Beklenmeyen yanıt gövdesi:`n$text"
 }
 
 $obj.choices[0].message.content
@@ -250,8 +261,8 @@ if ((Test-HasProperty $obj 'usage') -and $obj.usage) {
     $tps = if ($sw.Elapsed.TotalSeconds -gt 0) {
         [math]::Round($obj.usage.completion_tokens / $sw.Elapsed.TotalSeconds, 1)
     } else { 0 }
-    # InvariantCulture: a tr-TR host would otherwise print "0,02s" and break
-    # anything downstream that parses this line.
+    # InvariantCulture: tr-TR bir makinede aksi halde "0,02s" yazılır ve bu
+    # satırı ayrıştıran her şey bozulur.
     Write-Verbose ([string]::Format([cultureinfo]::InvariantCulture,
         "prompt={0} completion={1} total={2} | {3}s | {4} tok/s | finish={5}",
         $obj.usage.prompt_tokens, $obj.usage.completion_tokens, $obj.usage.total_tokens,

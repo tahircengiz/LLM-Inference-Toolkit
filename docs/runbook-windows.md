@@ -1,60 +1,63 @@
-# Test runbook — Windows / PowerShell
+# Test runbook'u — Windows / PowerShell
 
-Every test below has been **run and verified**: the command is exactly what you
-type, and the expected output is copied verbatim from a real run against the
-bundled mock server. Anything that legitimately varies between runs (latency,
-tok/s) is called out per test.
+Aşağıdaki her test **gerçekten çalıştırılmış ve doğrulanmıştır**: komut, yazmanız
+gerekenin aynısıdır ve beklenen çıktı, sahte sunucuya karşı yapılan gerçek bir
+koşumdan birebir kopyalanmıştır. Koşumlar arasında meşru olarak değişen şeyler
+(gecikme, tok/s) her testin altında ayrıca belirtilir.
 
-Linux / macOS / WSL users: see [runbook-linux.md](runbook-linux.md) instead.
+Linux / macOS / WSL kullanıyorsanız: [runbook-linux.md](runbook-linux.md).
 
-## Verified environments
+## Doğrulanmış ortamlar
 
-| Environment | PowerShell | Python | Result |
+| Ortam | PowerShell | Python | Sonuç |
 | --- | --- | --- | --- |
-| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 17/17 (Bash tests skipped by design) |
-| PowerShell 7.6.3 on macOS (local) | 7.6.3 | 3.9.6 | ✅ |
-| Windows PowerShell 5.1 | 5.1 | — | ⚠️ supported, not yet covered by CI — reports welcome |
+| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 22/22 (Bash testleri tasarım gereği atlanır) |
+| macOS üzerinde PowerShell 7.6.3 (yerel) | 7.6.3 | 3.9.6 | ✅ |
+| Windows PowerShell 5.1 | 5.1 | — | ⚠️ destekleniyor, CI kapsamında değil — bildirimlere açığız |
 
-CI confirms the one thing Windows usually gets wrong: the response comes back
-as clean UTF-8, so `çğışöüÇĞİŞÖÜ` survives the round trip.
+CI, Windows'ta genellikle yanlış giden şeyi doğruluyor: yanıt temiz UTF-8 olarak
+geliyor, yani `çğışöüÇĞİŞÖÜ` gidiş-dönüşten sağ çıkıyor.
 
-## Setup
+`.ps1` dosyaları UTF-8 **BOM** ile saklanır; PowerShell 5.1 BOM olmadan dosyayı
+sistem kod sayfasıyla okur ve kaynaktaki Türkçe metinleri bozar.
+
+## Hazırlık
 
 ```powershell
 git clone https://github.com/tahircengiz/LLM-Inference-Toolkit.git
 cd LLM-Inference-Toolkit
 
-# Window 1 - the mock server that produces the expected values below
+# 1. pencere - aşağıdaki beklenen değerleri üreten sahte sunucu
 python examples\mock_server.py --port 8899
 
-# Window 2
+# 2. pencere
 $env:LLM_ENDPOINT    = 'http://127.0.0.1:8899'
 $env:LLM_API_KEY     = 'sk-mock'
 $env:LLM_MODEL       = 'mock-model'
 $env:LLM_EMBED_MODEL = 'mock-model'
 ```
 
-If the script will not start:
+Betik başlamıyorsa:
 
 ```powershell
 Unblock-File .\powershell\Invoke-LlmPrompt.ps1
-# or, per invocation:
+# ya da her çağrıda:
 powershell -ExecutionPolicy Bypass -File .\powershell\Invoke-LlmPrompt.ps1 "Merhaba"
 ```
 
-To run every test at once instead of one by one:
+Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```powershell
-python tests\smoke_test.py     # expect: 17 passed, 0 failed, 1 skipped
+python tests\smoke_test.py     # beklenen: 22 geçti, 0 başarısız, 1 atlandı
 ```
 
-The skip is the Bash script — on Windows, use the PowerShell one.
+Atlanan, Bash betiğidir — Windows'ta PowerShell olanı kullanılır.
 
 ---
 
 ## Chat completions
 
-### W01 — Blocking request with diagnostics
+### W01 — Tanılamalı bloklayan istek
 
 ```powershell
 .\powershell\Invoke-LlmPrompt.ps1 "Merhaba, kendini tanıt" -Verbose
@@ -67,15 +70,14 @@ Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖ�
 VERBOSE: prompt=5 completion=16 total=21 | 0.02s | 1004.7 tok/s | finish=stop
 ```
 
-**Pass:** exit `0` · the answer on stdout · `finish=stop` · Turkish characters
-intact. The usage line always uses `.` as the decimal separator, even on a
-Turkish-locale machine — it is formatted with `InvariantCulture` so the output
-stays parseable.
-**Varies:** the `0.02s` and `1004.7 tok/s` figures.
+**Geçti sayılır:** exit `0` · yanıt stdout'ta · `finish=stop` · Türkçe karakterler
+bozulmamış. Usage satırı Türkçe locale'li bir makinede bile ondalık ayırıcı olarak
+`.` kullanır — `InvariantCulture` ile biçimlendirildiği için çıktı ayrıştırılabilir kalır.
+**Değişen:** `0.02s` ve `1004.7 tok/s` değerleri.
 
-> `$LASTEXITCODE` is only set for external programs. To check the exit code of
-> this script, run it as `pwsh -NoProfile -File .\powershell\Invoke-LlmPrompt.ps1 ...`
-> and then read `$LASTEXITCODE`.
+> `$LASTEXITCODE` yalnızca harici programlar için ayarlanır. Bu betiğin exit
+> kodunu görmek için `pwsh -NoProfile -File .\powershell\Invoke-LlmPrompt.ps1 ...`
+> şeklinde çalıştırıp ardından `$LASTEXITCODE` okuyun.
 
 ### W02 — Streaming (SSE)
 
@@ -87,15 +89,15 @@ stays parseable.
 Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 ```
 
-**Pass:** exit `0` · text appears **incrementally**, word by word (start the
-mock with `--delay 0.2` to see it clearly) · no `data:` prefixes · no usage
-line — servers omit it while streaming.
+**Geçti sayılır:** exit `0` · metin **parça parça**, kelime kelime beliriyor
+(net görmek için sahte sunucuyu `--delay 0.2` ile başlatın) · `data:` öneki yok ·
+usage satırı yok — sunucular streaming sırasında onu göndermez.
 
-Streaming uses `HttpClient` rather than `Invoke-WebRequest`, which buffers the
-whole response. Verified on PowerShell 7 in CI on all three OSes; on 5.1 the
-script loads `System.Net.Http` on demand.
+Streaming, yanıtın tamamını tamponlayan `Invoke-WebRequest` yerine `HttpClient`
+kullanır. CI'da üç işletim sisteminde de PowerShell 7 üzerinde doğrulanıyor;
+5.1'de `System.Net.Http` gerektiğinde yüklenir.
 
-### W03 — Raw JSON passthrough
+### W03 — Ham JSON
 
 ```powershell
 .\powershell\Invoke-LlmPrompt.ps1 "Merhaba" -Raw | ConvertFrom-Json |
@@ -108,10 +110,10 @@ model      finish total
 mock-model stop      17
 ```
 
-**Pass:** exit `0` · valid JSON · `model` is what you asked for — this is how
-you catch a gateway that silently routes elsewhere.
+**Geçti sayılır:** exit `0` · geçerli JSON · `model` istediğiniz model — sizi
+sessizce başka yere yönlendiren bir gateway'i böyle yakalarsınız.
 
-### W04 — System prompt and sampling flags
+### W04 — System prompt ve örnekleme parametreleri
 
 ```powershell
 .\powershell\Invoke-LlmPrompt.ps1 "Merhaba" -SystemPrompt "Kısa cevap ver" -Temperature 0.2 -MaxTokens 64
@@ -121,11 +123,11 @@ you catch a gateway that silently routes elsewhere.
 Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 ```
 
-**Pass:** exit `0`. Confirm the flags actually reached the server by adding
-`-Verbose`: the body must contain the `system` message, `"temperature":0.2` and
-`"max_tokens":64`. (The mock ignores sampling; a real model will not.)
+**Geçti sayılır:** exit `0`. `-Verbose` ekleyip gövdede `system` mesajını,
+`"temperature":0.2` ve `"max_tokens":64` değerlerini doğrulayın. (Sahte sunucu
+örneklemeyi yok sayar; gerçek model saymaz.)
 
-### W05 — Endpoint normalization
+### W05 — Endpoint normalizasyonu
 
 ```powershell
 .\powershell\Invoke-LlmPrompt.ps1 "ping" -Endpoint 'http://127.0.0.1:8899'
@@ -133,10 +135,10 @@ Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖ�
 .\powershell\Invoke-LlmPrompt.ps1 "ping" -Endpoint 'http://127.0.0.1:8899/v1/chat/completions'
 ```
 
-**Pass:** all three print the same answer and exit `0`. A gateway path prefix
-(`https://gw.example.com/team-a/v1`) is preserved.
+**Geçti sayılır:** üçü de aynı yanıtı basar ve exit `0` verir. Gateway path öneki
+(`https://gw.example.com/team-a/v1`) korunur.
 
-### W06 — HTTP error is surfaced, not swallowed
+### W06 — HTTP hatası yutulmuyor, gösteriliyor
 
 ```powershell
 pwsh -NoProfile -File .\powershell\Invoke-LlmPrompt.ps1 "x" -Model error-404
@@ -145,9 +147,10 @@ $LASTEXITCODE
 
 ```
 HTTP 404 from http://127.0.0.1:8899/v1/chat/completions
+
 {
   "error": {
-    "message": "injected error for model 'error-404'",
+    "message": "'error-404' modeli için enjekte edilmiş hata",
     "type": "injected_error",
     "code": null
   }
@@ -155,33 +158,34 @@ HTTP 404 from http://127.0.0.1:8899/v1/chat/completions
 1
 ```
 
-**Pass:** exit `1` · the server's own error body on **stderr** · nothing on
-stdout. The first line matches the Bash script character for character; the body
-below it is pretty-printed by PowerShell 7. Any `error-<status>` model name
-works (`error-401`, `error-429`, `error-500`).
+**Geçti sayılır:** exit `1` · sunucunun kendi hata gövdesi **stderr**'de ·
+stdout boş. İlk satır Bash betiğiyle karakter karakter aynıdır; altındaki gövdeyi
+PowerShell 7 kendi biçimlendirir (betik, PS'in eklediği `\uXXXX` kaçışlarını
+çözerek Türkçe mesajı okunur tutar). `error-<status>` biçimindeki her model adı
+çalışır (`error-401`, `error-429`, `error-500`).
 
-### W07 — Missing configuration fails fast
+### W07 — Eksik yapılandırma hemen hata veriyor
 
 ```powershell
 $env:LLM_MODEL = ''
 pwsh -NoProfile -File .\powershell\Invoke-LlmPrompt.ps1 "x"
 $LASTEXITCODE
-$env:LLM_MODEL = 'mock-model'   # restore
+$env:LLM_MODEL = 'mock-model'   # geri al
 ```
 
 ```
--Model is required (or set $env:LLM_MODEL).
+-Model parametresi gerekli (ya da $env:LLM_MODEL ayarlayın).
 1
 ```
 
-**Pass:** exit `1` before any network call, with a single clean stderr line —
-no PowerShell exception block. Same for a missing endpoint or key.
+**Geçti sayılır:** hiç ağ isteği yapılmadan exit `1` ve tek satırlık temiz bir
+stderr mesajı — PowerShell'in çok satırlı hata bloğu yok.
 
 ---
 
-## Model discovery
+## Model keşfi
 
-### W08 — List what the endpoint serves
+### W08 — Ne servis edildiğini listele
 
 ```powershell
 .\powershell\Get-LlmModels.ps1
@@ -193,30 +197,30 @@ mock-embed
 error-503
 ```
 
-**Pass:** exit `0` · one id per line, in the server's own order. The mock
-deliberately advertises three models, one of which does not work — that is what
-makes W11 reproducible.
+**Geçti sayılır:** exit `0` · satır başına bir id, sunucunun kendi sırasıyla.
+Sahte sunucu bilerek üç model yayınlar, biri çalışmaz — W11'i tekrarlanabilir
+kılan da bu.
 
-### W09 — Metadata table
+### W09 — Metadata tablosu
 
 ```powershell
 .\powershell\Get-LlmModels.ps1 -Long
 ```
 
 ```
-Model      Owner Created              Context
------      ----- -------              -------
+Model      Sahip Olusturulma          Context
+-----      ----- -----------          -------
 mock-model mock  2025-01-01T00:00:00Z 8192
 mock-embed mock  2025-03-01T00:00:00Z 512
 error-503  mock  -                    -
 ```
 
-**Pass:** exit `0` · timestamps in UTC ISO-8601, formatted with
-`InvariantCulture` so a tr-TR host prints the same string · `-` wherever the
-server publishes nothing.
-**Varies:** nothing. This output is byte-identical on every machine.
+**Geçti sayılır:** exit `0` · zaman damgaları UTC ISO-8601, `InvariantCulture` ile
+biçimlendirildiği için tr-TR bir makinede de aynı metin · sunucunun yayınlamadığı
+her alanda `-`.
+**Değişen:** hiçbir şey. Bu çıktı her makinede byte-byte aynıdır.
 
-`-Long` emits **objects**, so discovery composes with the rest of PowerShell:
+`-Long` **nesne** döndürür; keşif böylece PowerShell'in geri kalanıyla zincirlenir:
 
 ```powershell
 .\powershell\Get-LlmModels.ps1 -Long |
@@ -230,7 +234,7 @@ Model      Context
 mock-model 8192
 ```
 
-### W10 — Filter by substring
+### W10 — Altdizi filtresi
 
 ```powershell
 .\powershell\Get-LlmModels.ps1 mock-embed
@@ -240,10 +244,10 @@ mock-model 8192
 mock-embed
 ```
 
-**Pass:** exit `0` · case-insensitive match on the id · exit `1` with
-`no model matches <pattern>` when nothing matches.
+**Geçti sayılır:** exit `0` · büyük/küçük harf duyarsız eşleşme · eşleşme yoksa
+`'<desen>' desenine uyan model yok` ile exit `1`.
 
-### W11 — Probe: which models actually answer?
+### W11 — Yoklama: hangi modeller gerçekten cevap veriyor?
 
 ```powershell
 pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Probe
@@ -251,44 +255,44 @@ $LASTEXITCODE
 ```
 
 ```
-Model      Status Ms Note
------      ------ -- ----
-mock-model ok      3
-mock-embed 400     5 this model does not support chat completions
-error-503  503     1 injected error for model 'error-503'
-1/3 models answered
+Model      Status Ms Not
+-----      ------ -- ---
+mock-model ok      2
+mock-embed 400     3 bu model chat completions desteklemiyor
+error-503  503     1 'error-503' modeli için enjekte edilmiş hata
+1/3 model cevap verdi
 1
 ```
 
-**Pass:** exit `1` — because one advertised model fails, which is the point of
-the test · every model gets a row · the `Note` column carries the **server's
-own** error message · the `n/n models answered` summary goes to stderr, so the
-table itself stays clean when redirected.
-**Varies:** the `Ms` column.
+**Geçti sayılır:** exit `1` — çünkü yayınlanan modellerden biri hata veriyor,
+testin amacı da bu · her model için bir satır · `Not` sütununda **sunucunun kendi**
+hata mesajı · `n/n model cevap verdi` özeti stderr'e gider, böylece tablo
+yönlendirildiğinde temiz kalır.
+**Değişen:** `Ms` sütunu.
 
-A `400` on an embedding model is correct behaviour, not a fault. Each probe is a
-real `max_tokens: 1` request, so filter first on a paid gateway:
+Embedding modelindeki `400` doğru davranıştır, arıza değil. Her yoklama gerçek
+bir `max_tokens: 1` isteğidir; ücretli gateway'de önce filtreleyin:
 `.\powershell\Get-LlmModels.ps1 -Probe qwen`.
 
-### W12 — Assert a model is served (CI gate)
+### W12 — Model varlığını doğrula (CI kapısı)
 
 ```powershell
 pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Has mock-model
 $LASTEXITCODE
-pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Has no-such-model
+pwsh -NoProfile -File .\powershell\Get-LlmModels.ps1 -Has olmayan-model
 $LASTEXITCODE
 ```
 
 ```
 0
-model 'no-such-model' is not served by http://127.0.0.1:8899/v1/models
+'olmayan-model' modeli http://127.0.0.1:8899/v1/models tarafından servis edilmiyor
 1
 ```
 
-**Pass:** silent success, one stderr line and exit `1` on a miss. Matching is
-exact and case-sensitive — the same way the server matches.
+**Geçti sayılır:** başarıda sessiz, bulamazsa stderr'e tek satır ve exit `1`.
+Eşleşme birebir ve büyük/küçük harf duyarlıdır — sunucu da öyle eşleştirir.
 
-### W13 — Raw JSON
+### W13 — Ham JSON
 
 ```powershell
 .\powershell\Get-LlmModels.ps1 -Json | ConvertFrom-Json | Select-Object -ExpandProperty data | Select-Object -First 1
@@ -302,14 +306,77 @@ owned_by      : mock
 max_model_len : 8192
 ```
 
-**Pass:** exit `0` · valid JSON straight from the server.
+**Geçti sayılır:** exit `0` · sunucudan gelen geçerli JSON.
+
+---
+
+## Yük testi
+
+Yük testi Python'dur ve her işletim sisteminde aynı şekilde çalışır; ayrı bir
+PowerShell sürümü yoktur. `python3` yerine `python` (ya da `py -3`) kullanın.
+
+### W14 — TTFT, ITL ve throughput
+
+```powershell
+python python\chat-loadtest.py -n 12 -c 4
+```
+
+```
+Yük testi   model=mock-model · stream=açık · max_tokens=128
+Yük         12 istek · eşzamanlılık 4 · ısınma 1
+
+Sonuç       12 istek · 12 başarılı · 0 hata (%0.0)
+Süre        1.03s
+Throughput  11.7 istek/s · 116.6 çıktı token/s
+
+TTFT  (ms)  ort=68 p50=69 p90=71 p95=71 p99=72 maks=72
+ITL   (ms)  ort=26.6 p50=28.1 p95=30.3 maks=30.9
+E2E   (ms)  ort=333 p50=334 p95=347 p99=350 maks=350
+Çıktı token ort=10.0 · toplam=120
+```
+
+**Geçti sayılır:** exit `0` · `12 istek · 12 başarılı · 0 hata` · **TTFT belirgin
+biçimde ITL'den büyük** (sahte sunucu ilk token'dan önce üç chunk gecikmesi
+bekler, bu ölçümün doğruluğunun kanıtıdır).
+**Değişen:** bütün zaman değerleri.
+
+### W15 — SLO kapısı
+
+```powershell
+python python\chat-loadtest.py -n 6 -c 2 --max-ttft-p95 2000
+$LASTEXITCODE
+python python\chat-loadtest.py -n 6 -c 2 --max-ttft-p95 10
+$LASTEXITCODE
+```
+
+```
+SLO         TTFT p95 72ms <= 2000ms ✓
+0
+SLO ihlali: TTFT p95 73ms > 10ms
+1
+```
+
+**Geçti sayılır:** bütçe içindeyken exit `0`, aşıldığında stderr'e tek satır ve
+exit `1`.
+
+### W16 — Diğer modlar
+
+```powershell
+python python\chat-loadtest.py -n 8 -c 4 --no-stream       # TTFT ölçülmez, E2E ölçülür
+python python\chat-loadtest.py --duration 60 -c 16         # sayı yerine süre
+python python\chat-loadtest.py -n 100 -c 16 --csv sonuc.csv --json > ozet.json
+python python\chat-loadtest.py -n 4 -c 2 -m error-503      # hata dökümü, exit 1
+```
+
+Beklenen çıktılar Linux runbook'undaki
+[L16–L18](runbook-linux.md#yük-testi) ile birebir aynıdır; sayıların nasıl
+okunacağı [loadtest.md](loadtest.md) sayfasında.
 
 ---
 
 ## Embeddings
 
-The embeddings script is Python and behaves identically on every OS. Use
-`python` (or `py -3`) instead of `python3`:
+Embeddings betiği de Python'dur ve her işletim sisteminde aynı davranır:
 
 ```powershell
 python python\embed-test.py "Kubernetes GPU node etiketleme"
@@ -320,21 +387,24 @@ python python\embed-test.py --dimensions 64 --encoding-format base64 "merhaba"
 python python\embed-test.py -m error-503 "x"
 ```
 
-Expected output for each, plus what every check protects you from, is in
-[runbook-linux.md § Embeddings](runbook-linux.md#embeddings) — the values are
-identical. CI verified that the suite produces the **same cosine values**
-(`para=0.2634 unrelated=-0.0635`) on Windows, Ubuntu and macOS.
+Her birinin beklenen çıktısı ve kontrollerin neyi koruduğu
+[runbook-linux.md § Embeddings](runbook-linux.md#embeddings) sayfasında — değerler
+birebir aynıdır. CI, sağlık paketinin Windows, Ubuntu ve macOS'ta **aynı cosine
+değerlerini** (`para=0.2634 alakasız=-0.0635`) ürettiğini doğruladı.
 
-If Turkish characters look wrong in your console (but fine in a file), set the
-console encoding once per session:
+Konsolda Türkçe karakterler bozuk görünüyorsa (dosyada düzgünse) oturum başına
+bir kez:
 
 ```powershell
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 ```
 
+Python betikleri kendi çıktılarını zaten UTF-8'e sabitler; bu ayar PowerShell
+betiklerinin çıktısı içindir.
+
 ---
 
-## Against a real endpoint
+## Gerçek bir endpoint'e karşı
 
 ```powershell
 $env:LLM_ENDPOINT    = 'http://10.0.0.10:8000'
@@ -343,15 +413,16 @@ $env:LLM_MODEL       = 'Qwen/Qwen2.5-7B-Instruct'
 $env:LLM_EMBED_MODEL = 'BAAI/bge-m3'
 ```
 
-Then re-run W01–W13. Expectations are the same as the Linux runbook's
-[real-endpoint table](runbook-linux.md#against-a-real-endpoint).
+Ardından W01–W16'yı tekrarlayın. Beklentiler Linux runbook'undaki
+[gerçek endpoint tablosuyla](runbook-linux.md#gerçek-bir-endpointe-karşı) aynıdır.
 
-Windows-specific things to watch for:
+Windows'a özgü dikkat edilecekler:
 
-| Symptom | Cause | Fix |
+| Belirti | Sebep | Çözüm |
 | --- | --- | --- |
-| *Could not create SSL/TLS secure channel* | Windows PowerShell 5.1 defaulting below TLS 1.2 | The script already forces TLS 1.2. If it persists, the endpoint needs TLS 1.3 → use PowerShell 7 |
-| *The remote certificate is invalid* | Internal CA not trusted | `-Insecure` for a lab endpoint, or install the CA under `Cert:\LocalMachine\Root` |
-| `TÃ¼rkÃ§e` in output | Console code page, not the response | `[Console]::OutputEncoding = [Text.Encoding]::UTF8` |
-| Hangs from a corporate network | Proxy | .NET uses the system proxy — check `netsh winhttp show proxy` and bypass internal hosts |
-| Script will not run | Execution policy | `Unblock-File`, or `-ExecutionPolicy Bypass` |
+| *Could not create SSL/TLS secure channel* | Windows PowerShell 5.1 TLS 1.2 altına düşüyor | Betik TLS 1.2'yi zaten zorluyor. Devam ediyorsa endpoint TLS 1.3 istiyordur → PowerShell 7 kullanın |
+| *The remote certificate is invalid* | İç CA güvenilmiyor | Lab endpoint'i için `-Insecure`, ya da CA'yı `Cert:\LocalMachine\Root` altına kurun |
+| Çıktıda `TÃ¼rkÃ§e` | Yanıt değil, konsol kod sayfası | `[Console]::OutputEncoding = [Text.Encoding]::UTF8` |
+| Betikteki Türkçe metinler bozuk | `.ps1` BOM'suz kaydedilmiş | UTF-8 BOM ile kaydedin (bu depodakiler öyle) |
+| Kurumsal ağdan takılıyor | Proxy | .NET sistem proxy'sini kullanır — `netsh winhttp show proxy` ile bakın, iç host'ları bypass edin |
+| Betik çalışmıyor | Execution policy | `Unblock-File` ya da `-ExecutionPolicy Bypass` |

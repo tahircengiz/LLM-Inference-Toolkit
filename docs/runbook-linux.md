@@ -1,51 +1,51 @@
-# Test runbook — Linux / macOS / WSL
+# Test runbook'u — Linux / macOS / WSL
 
-Every test below has been **run and verified**: the command is exactly what you
-type, and the expected output is copied verbatim from a real run against the
-bundled mock server. Anything that legitimately varies between runs (latency,
-tok/s) is called out per test.
+Aşağıdaki her test **gerçekten çalıştırılmış ve doğrulanmıştır**: komut, yazmanız
+gerekenin aynısıdır ve beklenen çıktı, sahte sunucuya karşı yapılan gerçek bir
+koşumdan birebir kopyalanmıştır. Koşumlar arasında meşru olarak değişen şeyler
+(gecikme, tok/s) her testin altında ayrıca belirtilir.
 
-Windows users: see [runbook-windows.md](runbook-windows.md) instead.
+Windows kullanıyorsanız: [runbook-windows.md](runbook-windows.md).
 
-## Verified environments
+## Doğrulanmış ortamlar
 
-| Environment | Shell | Python | curl / jq | Result |
+| Ortam | Kabuk | Python | curl / jq | Sonuç |
 | --- | --- | --- | --- | --- |
-| macOS 26.5.2 (local) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 31/31 |
-| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 31/31 |
-| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 31/31 |
+| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 36/36 |
+| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 36/36 |
+| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 36/36 |
 
-Bash 3.2 is deliberate: it is what macOS ships, so anything that works there
-works on every modern Linux too.
+Bash 3.2 bilinçli bir hedef: macOS'un getirdiği sürüm o, orada çalışan her şey
+modern Linux'ta da çalışır.
 
-## Setup
+## Hazırlık
 
 ```bash
 git clone https://github.com/tahircengiz/LLM-Inference-Toolkit.git
 cd LLM-Inference-Toolkit
-chmod +x bash/llm-prompt.sh bash/llm-models.sh python/embed-test.py
+chmod +x bash/llm-prompt.sh bash/llm-models.sh python/embed-test.py python/chat-loadtest.py
 
-# Terminal 1 - the mock server that produces the expected values below
+# 1. terminal - aşağıdaki beklenen değerleri üreten sahte sunucu
 python3 examples/mock_server.py --port 8899
 
-# Terminal 2
+# 2. terminal
 export LLM_ENDPOINT=http://127.0.0.1:8899
 export LLM_API_KEY=sk-mock
 export LLM_MODEL=mock-model
 export LLM_EMBED_MODEL=mock-model
 ```
 
-To run every test at once instead of one by one:
+Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```bash
-python3 tests/smoke_test.py          # expect: 31 passed, 0 failed
+python3 tests/smoke_test.py          # beklenen: 36 geçti, 0 başarısız
 ```
 
 ---
 
 ## Chat completions
 
-### L01 — Blocking request with diagnostics
+### L01 — Tanılamalı bloklayan istek
 
 ```bash
 bash/llm-prompt.sh -v "Merhaba, kendini tanıt"
@@ -55,12 +55,12 @@ bash/llm-prompt.sh -v "Merhaba, kendini tanıt"
 POST http://127.0.0.1:8899/v1/chat/completions
 {"model":"mock-model","messages":[{"role":"user","content":"Merhaba, kendini tanıt"}],"temperature":0.0,"max_tokens":512,"stream":false}
 Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
-prompt=5 completion=16 total=21 | 0.01s | 1333.3 tok/s | finish=stop
+prompt=5 completion=16 total=21 | 0.02s | 941.2 tok/s | finish=stop
 ```
 
-**Pass:** exit `0` · the answer on stdout · `finish=stop` · Turkish characters
-intact (`çğışöüÇĞİŞÖÜ`, not `Ã§ÄŸ`) · the request line and usage line on stderr.
-**Varies:** the `0.01s` and `1333.3 tok/s` figures.
+**Geçti sayılır:** exit `0` · yanıt stdout'ta · `finish=stop` · Türkçe karakterler
+bozulmamış (`çğışöüÇĞİŞÖÜ`, `Ã§ÄŸ` değil) · istek satırı ve usage satırı stderr'de.
+**Değişen:** `0.02s` ve `941.2 tok/s` değerleri.
 
 ### L02 — Streaming (SSE)
 
@@ -72,11 +72,12 @@ bash/llm-prompt.sh --stream "Merhaba"
 Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 ```
 
-**Pass:** exit `0` · text appears **incrementally**, word by word (use
-`--delay 0.2` on the mock to see it clearly) · no `data:` prefixes or JSON in
-the output · no `usage` line — servers omit it while streaming.
+**Geçti sayılır:** exit `0` · metin **parça parça**, kelime kelime beliriyor
+(net görmek için sahte sunucuyu `--delay 0.2` ile başlatın) · çıktıda `data:`
+öneki ya da JSON yok · usage satırı yok — sunucular streaming sırasında onu
+göndermez.
 
-### L03 — Raw JSON passthrough
+### L03 — Ham JSON
 
 ```bash
 bash/llm-prompt.sh --raw "Merhaba" | jq -c '{model, finish: .choices[0].finish_reason, usage}'
@@ -86,10 +87,10 @@ bash/llm-prompt.sh --raw "Merhaba" | jq -c '{model, finish: .choices[0].finish_r
 {"model":"mock-model","finish":"stop","usage":{"prompt_tokens":1,"completion_tokens":16,"total_tokens":17}}
 ```
 
-**Pass:** exit `0` · valid JSON · `model` is what you asked for — this is how
-you catch a gateway that silently routes elsewhere.
+**Geçti sayılır:** exit `0` · geçerli JSON · `model` istediğiniz model — sizi
+sessizce başka yere yönlendiren bir gateway'i böyle yakalarsınız.
 
-### L04 — Prompt from stdin
+### L04 — stdin'den prompt
 
 ```bash
 echo "Merhaba" | bash/llm-prompt.sh
@@ -99,10 +100,10 @@ echo "Merhaba" | bash/llm-prompt.sh
 Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 ```
 
-**Pass:** exit `0` · identical to passing the prompt as an argument. Works with
-`bash/llm-prompt.sh < prompt.txt` too.
+**Geçti sayılır:** exit `0` · parametre olarak vermekle birebir aynı sonuç.
+`bash/llm-prompt.sh < prompt.txt` de çalışır.
 
-### L05 — System prompt and sampling flags
+### L05 — System prompt ve örnekleme parametreleri
 
 ```bash
 bash/llm-prompt.sh -s "Kısa cevap ver" -t 0.2 -n 64 "Merhaba"
@@ -112,11 +113,11 @@ bash/llm-prompt.sh -s "Kısa cevap ver" -t 0.2 -n 64 "Merhaba"
 Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 ```
 
-**Pass:** exit `0`. Confirm the flags actually reached the server with `-v`:
-the body must contain the `system` message, `"temperature":0.2` and
-`"max_tokens":64`. (The mock ignores sampling; a real model will not.)
+**Geçti sayılır:** exit `0`. Parametrelerin sunucuya gerçekten gittiğini `-v` ile
+doğrulayın: gövdede `system` mesajı, `"temperature":0.2` ve `"max_tokens":64`
+görünmeli. (Sahte sunucu örneklemeyi yok sayar; gerçek model saymaz.)
 
-### L06 — Endpoint normalization
+### L06 — Endpoint normalizasyonu
 
 ```bash
 bash/llm-prompt.sh -e http://127.0.0.1:8899                      "ping"
@@ -124,10 +125,10 @@ bash/llm-prompt.sh -e http://127.0.0.1:8899/v1                   "ping"
 bash/llm-prompt.sh -e http://127.0.0.1:8899/v1/chat/completions  "ping"
 ```
 
-**Pass:** all three print the same answer and exit `0`. A gateway path prefix
-(`https://gw.example.com/team-a/v1`) is preserved.
+**Geçti sayılır:** üçü de aynı yanıtı basar ve exit `0` verir. Gateway path öneki
+(`https://gw.example.com/team-a/v1`) korunur.
 
-### L07 — HTTP error is surfaced, not swallowed
+### L07 — HTTP hatası yutulmuyor, gösteriliyor
 
 ```bash
 bash/llm-prompt.sh -m error-404 "x"; echo "exit=$?"
@@ -135,32 +136,33 @@ bash/llm-prompt.sh -m error-404 "x"; echo "exit=$?"
 
 ```
 HTTP 404 from http://127.0.0.1:8899/v1/chat/completions
-{"error": {"message": "injected error for model 'error-404'", "type": "injected_error", "code": null}}
+{"error": {"message": "'error-404' modeli için enjekte edilmiş hata", "type": "injected_error", "code": null}}
 exit=1
 ```
 
-**Pass:** exit `1` · the server's own error body on **stderr** · nothing on
-stdout. Any `error-<status>` model name works (`error-401`, `error-429`,
-`error-500`) — use it to rehearse how your pipeline reacts.
+**Geçti sayılır:** exit `1` · sunucunun kendi hata gövdesi **stderr**'de ·
+stdout boş. `error-<status>` biçimindeki her model adı çalışır (`error-401`,
+`error-429`, `error-500`) — hattınızın nasıl tepki verdiğini provası için kullanın.
 
-### L08 — Missing configuration fails fast
+### L08 — Eksik yapılandırma hemen hata veriyor
 
 ```bash
 LLM_MODEL="" bash/llm-prompt.sh "x"; echo "exit=$?"
 ```
 
 ```
-model required (-m or $LLM_MODEL)
+model gerekli (-m ya da $LLM_MODEL)
 exit=1
 ```
 
-**Pass:** exit `1` before any network call. Same for a missing endpoint or key.
+**Geçti sayılır:** hiç ağ isteği yapılmadan exit `1`. Eksik endpoint ve anahtar
+için de aynısı geçerli.
 
 ---
 
-## Model discovery
+## Model keşfi
 
-### L09 — List what the endpoint serves
+### L09 — Ne servis edildiğini listele
 
 ```bash
 bash/llm-models.sh
@@ -172,32 +174,32 @@ mock-embed
 error-503
 ```
 
-**Pass:** exit `0` · one id per line, in the server's own order · pipeable
-(`bash/llm-models.sh | wc -l`). The mock deliberately advertises three models,
-one of which does not work — that is what makes L12 reproducible.
+**Geçti sayılır:** exit `0` · satır başına bir id, sunucunun kendi sırasıyla ·
+pipe'lanabilir (`bash/llm-models.sh | wc -l`). Sahte sunucu bilerek üç model
+yayınlar, biri çalışmaz — L12'yi tekrarlanabilir kılan da bu.
 
-### L10 — Metadata table
+### L10 — Metadata tablosu
 
 ```bash
 bash/llm-models.sh -l
 ```
 
 ```
-MODEL       OWNER  CREATED               CONTEXT
+MODEL       SAHIP  OLUSTURULMA           CONTEXT
 mock-model  mock   2025-01-01T00:00:00Z  8192
 mock-embed  mock   2025-03-01T00:00:00Z  512
 error-503   mock   -                     -
 
-3 model(s)
+3 model
 ```
 
-**Pass:** exit `0` · timestamps in UTC ISO-8601 (machine-independent) · `-`
-wherever the server publishes nothing. `CONTEXT` reads `max_model_len`, then
-`context_length`, then `max_input_tokens` — with vLLM this is the quickest way
-to see the real `--max-model-len` in effect.
-**Varies:** nothing. This output is byte-identical on every machine.
+**Geçti sayılır:** exit `0` · zaman damgaları UTC ISO-8601 (makineden bağımsız) ·
+sunucunun yayınlamadığı her alanda `-`. `CONTEXT` sütunu sırasıyla
+`max_model_len`, `context_length` ve `max_input_tokens` okur — vLLM'de yürürlükteki
+gerçek `--max-model-len` değerini görmenin en hızlı yolu.
+**Değişen:** hiçbir şey. Bu çıktı her makinede byte-byte aynıdır.
 
-### L11 — Filter by substring
+### L11 — Altdizi filtresi
 
 ```bash
 bash/llm-models.sh embed
@@ -207,56 +209,56 @@ bash/llm-models.sh embed
 mock-embed
 ```
 
-**Pass:** exit `0` · case-insensitive match on the id · exit `1` with
-`no model matches <pattern>` when nothing matches. Useful against a gateway
-that lists hundreds of aliases.
+**Geçti sayılır:** exit `0` · id üzerinde büyük/küçük harf duyarsız eşleşme ·
+eşleşme yoksa `'<desen>' desenine uyan model yok` ile exit `1`. Yüzlerce alias
+yayınlayan gateway'lerde işe yarar.
 
-### L12 — Probe: which models actually answer?
+### L12 — Yoklama: hangi modeller gerçekten cevap veriyor?
 
 ```bash
 bash/llm-models.sh --probe; echo "exit=$?"
 ```
 
 ```
-MODEL       STATUS    LATENCY  NOTE
+MODEL       STATUS    LATENCY  NOT
 mock-model  ok           16ms
-mock-embed  400          17ms  this model does not support chat completions
-error-503   503          17ms  injected error for model 'error-503'
+mock-embed  400          17ms  bu model chat completions desteklemiyor
+error-503   503          17ms  'error-503' modeli için enjekte edilmiş hata
 
-1/3 models answered
+1/3 model cevap verdi
 exit=1
 ```
 
-**Pass:** exit `1` — because one advertised model fails, which is the point of
-the test · every model gets a row · the NOTE column carries the **server's own**
-error message.
-**Varies:** the latency column.
+**Geçti sayılır:** exit `1` — çünkü yayınlanan modellerden biri hata veriyor,
+testin amacı da bu · her model için bir satır · NOT sütununda **sunucunun kendi**
+hata mesajı.
+**Değişen:** gecikme sütunu.
 
-A `400` on an embedding model is correct behaviour, not a fault. Read the NOTE
-before concluding anything. Each probe is a real `max_tokens: 1` request, so
-filter first on a paid gateway: `bash/llm-models.sh --probe qwen`.
+Embedding modelindeki `400` doğru davranıştır, arıza değil. Karar vermeden önce
+NOT sütununu okuyun. Her yoklama gerçek bir `max_tokens: 1` isteğidir; ücretli
+gateway'de önce filtreleyin: `bash/llm-models.sh --probe qwen`.
 
-### L13 — Assert a model is served (CI gate)
+### L13 — Model varlığını doğrula (CI kapısı)
 
 ```bash
-bash/llm-models.sh --has mock-model;     echo "exit=$?"
-bash/llm-models.sh --has no-such-model;  echo "exit=$?"
+bash/llm-models.sh --has mock-model;      echo "exit=$?"
+bash/llm-models.sh --has olmayan-model;   echo "exit=$?"
 ```
 
 ```
 exit=0
-model 'no-such-model' is not served by http://127.0.0.1:8899/v1/models
+'olmayan-model' modeli http://127.0.0.1:8899/v1/models tarafından servis edilmiyor
 exit=1
 ```
 
-**Pass:** silent success (like `grep -q`), one stderr line and exit `1` on a
-miss. Matching is exact and case-sensitive — the same way the server matches.
+**Geçti sayılır:** başarıda sessiz (`grep -q` gibi), bulamazsa stderr'e tek satır
+ve exit `1`. Eşleşme birebir ve büyük/küçük harf duyarlıdır — sunucu da öyle eşleştirir.
 
 ```bash
-bash/llm-models.sh --has "$LLM_MODEL" || { echo "model missing"; exit 1; }
+bash/llm-models.sh --has "$LLM_MODEL" || { echo "model yok"; exit 1; }
 ```
 
-### L14 — Raw JSON
+### L14 — Ham JSON
 
 ```bash
 bash/llm-models.sh --json | jq '.data[0]'
@@ -272,14 +274,103 @@ bash/llm-models.sh --json | jq '.data[0]'
 }
 ```
 
-**Pass:** exit `0` · valid JSON. Use this when a server publishes extra fields
-worth reading (vLLM adds `max_model_len` and `permission`).
+**Geçti sayılır:** exit `0` · geçerli JSON. Sunucu ek alanlar yayınlıyorsa
+(vLLM `max_model_len` ve `permission` ekler) burada görürsünüz.
+
+---
+
+## Yük testi
+
+### L15 — TTFT, ITL ve throughput
+
+```bash
+python3 python/chat-loadtest.py -n 12 -c 4
+```
+
+```
+Yük testi   model=mock-model · stream=açık · max_tokens=128
+Yük         12 istek · eşzamanlılık 4 · ısınma 1
+
+Sonuç       12 istek · 12 başarılı · 0 hata (%0.0)
+Süre        1.03s
+Throughput  11.7 istek/s · 116.6 çıktı token/s
+
+TTFT  (ms)  ort=68 p50=69 p90=71 p95=71 p99=72 maks=72
+ITL   (ms)  ort=26.6 p50=28.1 p95=30.3 maks=30.9
+E2E   (ms)  ort=333 p50=334 p95=347 p99=350 maks=350
+Çıktı token ort=10.0 · toplam=120
+```
+
+**Geçti sayılır:** exit `0` · `12 istek · 12 başarılı · 0 hata` · TTFT, ITL ve
+E2E satırlarının üçü de dolu · **TTFT belirgin biçimde ITL'den büyük**.
+**Değişen:** bütün zaman değerleri.
+
+Son madde tesadüf değil: sahte sunucu ilk token'dan önce bilerek üç chunk
+gecikmesi kadar bekler, sonra her chunk arasında bir gecikme koyar. Yani doğru
+çalışan bir ölçümde TTFT ≈ 3 × ITL çıkmalıdır. `tests/smoke_test.py` bunu her
+koşumda kontrol eder — ölçümün iki metriği birbirine karıştırmadığının kanıtı:
+
+```
+PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
+```
+
+### L16 — Streaming olmadan
+
+```bash
+python3 python/chat-loadtest.py -n 8 -c 4 --no-stream
+```
+
+```
+TTFT  (ms)  ölçülmedi (--no-stream)
+E2E   (ms)  ort=1 p50=1 p95=1 p99=1 maks=1
+Çıktı token ort=16.0 · toplam=128
+```
+
+**Geçti sayılır:** exit `0` · TTFT satırı ölçülemediğini açıkça söylüyor · E2E
+yine raporlanıyor. Bloklayan istemcilerin gördüğü gecikmeyi ölçmek için kullanın.
+
+### L17 — SLO kapısı
+
+```bash
+python3 python/chat-loadtest.py -n 6 -c 2 --max-ttft-p95 2000 | tail -1
+python3 python/chat-loadtest.py -n 6 -c 2 --max-ttft-p95 10 >/dev/null; echo "exit=$?"
+```
+
+```
+SLO         TTFT p95 72ms <= 2000ms ✓
+SLO ihlali: TTFT p95 73ms > 10ms
+exit=1
+```
+
+**Geçti sayılır:** bütçe içindeyken exit `0` ve ✓ satırı; aşıldığında stderr'e
+tek satır ve exit `1`. `--max-error-rate` varsayılan olarak 0'dır: tek bir
+başarısız istek bile exit `1` demektir.
+
+### L18 — Hata dökümü
+
+```bash
+python3 python/chat-loadtest.py -n 4 -c 2 -m error-503; echo "exit=$?"
+```
+
+```
+TTFT  (ms)  ölçülemedi (başarılı istek yok)
+Çıktı token ort=0.0 · toplam=0
+
+Hatalar     4× HTTP 503: 'error-503' modeli için enjekte edilmiş hata
+exit=1
+```
+
+**Geçti sayılır:** exit `1` · hatalar status'a göre gruplanmış ve sunucunun kendi
+mesajıyla yazılmış · TTFT satırı "ölçülemedi" ile "ölçülmedi (--no-stream)"
+arasındaki farkı doğru söylüyor.
+
+Ayrıntılı kullanım ve bu sayıların nasıl okunacağı: [loadtest.md](loadtest.md).
 
 ---
 
 ## Embeddings
 
-### E01 — Inspect a vector
+### E01 — Vektörü incele
 
 ```bash
 python3 python/embed-test.py "Kubernetes GPU node etiketleme"
@@ -288,15 +379,15 @@ python3 python/embed-test.py "Kubernetes GPU node etiketleme"
 ```
 [0] Kubernetes GPU node etiketleme                     dim=128  |v|=1.000000  min=-0.5466 max=+0.4685
      head=[+0.0000, +0.0000, -0.0781, +0.0000, +0.0000, ...]
-latency=7ms  texts=1  prompt_tokens=7  total_tokens=7
+gecikme=7ms  metin=1  prompt_tokens=7  total_tokens=7
 ```
 
-**Pass:** exit `0` · `dim=128` (mock) · `|v|=1.000000`.
-**Varies:** `latency`. Against a real model, `dim` is the model's width
-(1024 for bge-m3, 1536 for text-embedding-3-small) and the `head` values are
-dense rather than mostly zero.
+**Geçti sayılır:** exit `0` · `dim=128` (sahte sunucu) · `|v|=1.000000`.
+**Değişen:** `gecikme`. Gerçek bir modelde `dim` modelin genişliğidir (bge-m3
+için 1024, text-embedding-3-small için 1536) ve `head` değerleri çoğunlukla sıfır
+yerine yoğun olur.
 
-### E02 — Cosine similarity, paraphrase vs unrelated
+### E02 — Cosine benzerliği: paraphrase ve alakasız
 
 ```bash
 python3 python/embed-test.py --pair \
@@ -309,44 +400,44 @@ python3 python/embed-test.py --pair \
 ```
 
 ```
-cosine=0.263365  dim=128  latency=6ms
-cosine=-0.063540  dim=128  latency=6ms
+cosine=0.263365  dim=128  gecikme=8ms
+cosine=-0.063540  dim=128  gecikme=8ms
 ```
 
-**Pass:** the paraphrase pair scores **higher** than the unrelated pair. The
-absolute numbers above are the mock's; a real retrieval model typically gives
-~0.7–0.9 for the paraphrase and ~0.1–0.4 for the unrelated pair. **The ordering
-is the assertion, not the value.**
+**Geçti sayılır:** paraphrase çifti, alakasız çiftten **yüksek** skor alıyor.
+Yukarıdaki mutlak değerler sahte sunucuya aittir; gerçek bir retrieval modeli
+paraphrase için ~0.7–0.9, alakasız için ~0.1–0.4 verir. **İddia sıralamadır,
+değerin kendisi değil.**
 
-### E03 — Sanity suite (the main gate)
+### E03 — Sağlık paketi (asıl kapı)
 
 ```bash
 python3 python/embed-test.py --suite; echo "exit=$?"
 ```
 
 ```
-PASS  dim consistent across batch            dim=128
-PASS  vectors L2-normalized                  norms=1.000000, 1.000000, 1.000000
-PASS  deterministic across calls             max|delta|=0.000e+00 cos=1.00000000
-PASS  cos(paraphrase) > cos(unrelated)       para=0.2634 unrelated=-0.0635 margin=0.3269
-PASS  cos(identical) ~= 1.0                  cos=1.00000000
-PASS  batch position does not change vector  cos(pos0)=1.00000000 cos(pos3)=1.00000000
-PASS  long input (~264000 chars) handled     truncated silently, prompt_tokens=66000
+PASS  batch içinde dim tutarlı               dim=128
+PASS  vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
+PASS  çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
+PASS  cos(paraphrase) > cos(alakasız)        para=0.2634 alakasız=-0.0635 fark=0.3269
+PASS  cos(aynı metin) ~= 1.0                 cos=1.00000000
+PASS  batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
+PASS  uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=66000
 
-7/7 passed  (dim=128, first call 6ms, prompt_tokens=36)
+7/7 geçti  (dim=128, ilk çağrı 6ms, prompt_tokens=36)
 exit=0
 ```
 
-**Pass:** `7/7 passed` and exit `0`. Exit is `1` if any check fails, so this
-line works as a deployment gate:
+**Geçti sayılır:** `7/7 geçti` ve exit `0`. Herhangi bir kontrol düşerse exit `1`
+olur, yani doğrudan deploy kapısı olarak kullanılabilir:
 
 ```bash
-python3 python/embed-test.py --suite || { echo "embedding endpoint unhealthy"; exit 1; }
+python3 python/embed-test.py --suite || { echo "embedding endpoint sağlıksız"; exit 1; }
 ```
 
-Identical `cos` values were produced on Ubuntu, macOS and Windows in CI — the
-suite is reproducible across platforms. What each check protects you from is
-explained in [embeddings.md](embeddings.md#--suite--is-this-model-wired-up-correctly).
+Aynı `cos` değerleri CI'da Ubuntu, macOS ve Windows'ta da üretildi — paket
+platformlar arası tekrarlanabilir. Her kontrolün neyi koruduğu:
+[embeddings.md](embeddings.md#--suite--bu-model-doğru-bağlanmış-mı).
 
 ### E04 — Throughput benchmark
 
@@ -355,16 +446,16 @@ python3 python/embed-test.py --bench 64 --concurrency 8 --batch-size 8
 ```
 
 ```
-requests=8  batch_size=8  concurrency=8  texts=64
-wall=0.11s  throughput=600.7 texts/s  75.1 req/s
-latency ms: mean=22 p50=10 p95=72 p99=99 max=105
+istek=8  batch_size=8  eşzamanlılık=8  metin=64
+süre=0.11s  throughput=587.7 metin/s  73.5 istek/s
+gecikme ms: ort=46 p50=11 p95=108 p99=108 maks=108
 ```
 
-**Pass:** exit `0` · `requests = 64 ÷ 8 = 8` · all latency percentiles present.
-**Varies:** every number. Against the mock they measure your loopback and
-Python; only real-endpoint numbers mean anything for capacity planning.
+**Geçti sayılır:** exit `0` · `istek = 64 ÷ 8 = 8` · tüm gecikme yüzdelikleri var.
+**Değişen:** bütün sayılar. Sahte sunucuya karşı bunlar loopback'i ve Python'ı
+ölçer; kapasite planlaması için yalnızca gerçek endpoint rakamları anlamlıdır.
 
-### E05 — Matryoshka dimensions and base64 transport
+### E05 — Matryoshka dimensions ve base64
 
 ```bash
 python3 python/embed-test.py --dimensions 64 --encoding-format base64 "merhaba"
@@ -373,14 +464,14 @@ python3 python/embed-test.py --dimensions 64 --encoding-format base64 "merhaba"
 ```
 [0] merhaba                                            dim=64  |v|=1.000000  min=-0.8944 max=+0.1491
      head=[+0.0000, +0.0000, +0.0000, +0.0000, +0.0000, ...]
-latency=6ms  texts=1  prompt_tokens=1  total_tokens=1
+gecikme=6ms  metin=1  prompt_tokens=1  total_tokens=1
 ```
 
-**Pass:** `dim=64` — the server honoured `dimensions`, and the base64 float32
-payload decoded correctly. If `dim` comes back at full width, the server
-ignored the parameter: do **not** build an index assuming it works.
+**Geçti sayılır:** `dim=64` — sunucu `dimensions` parametresini uyguladı ve
+base64 float32 gövdesi doğru çözüldü. `dim` tam genişlikte dönüyorsa sunucu
+parametreyi yok saymıştır: bunun çalıştığını varsayarak index kurmayın.
 
-### E06 — Embeddings error path
+### E06 — Embeddings hata yolu
 
 ```bash
 python3 python/embed-test.py -m error-503 "x"; echo "exit=$?"
@@ -388,17 +479,17 @@ python3 python/embed-test.py -m error-503 "x"; echo "exit=$?"
 
 ```
 HTTP 503 from http://127.0.0.1:8899/v1/embeddings
-{"error": {"message": "injected error for model 'error-503'", "type": "injected_error", "code": null}}
+{"error": {"message": "'error-503' modeli için enjekte edilmiş hata", "type": "injected_error", "code": null}}
 exit=1
 ```
 
-**Pass:** exit `1` with the server's body on stderr.
+**Geçti sayılır:** exit `1` ve sunucunun gövdesi stderr'de.
 
 ---
 
-## Against a real endpoint
+## Gerçek bir endpoint'e karşı
 
-Swap the three variables and re-run the same tests:
+Üç değişkeni değiştirip aynı testleri tekrarlayın:
 
 ```bash
 export LLM_ENDPOINT=http://10.0.0.10:8000
@@ -407,22 +498,24 @@ export LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 export LLM_EMBED_MODEL=BAAI/bge-m3
 ```
 
-What to expect instead of the mock's fixed values:
+Sahte sunucunun sabit değerleri yerine beklenecekler:
 
-| Test | Expectation against a real server |
+| Test | Gerçek sunucuda beklenen |
 | --- | --- |
-| L01 | A real answer · `finish=stop` (`length` means you hit `-n`) · tok/s in the tens-to-hundreds for a small model on one GPU |
-| L02 | Tokens appear progressively. If the whole answer lands at once, a proxy is buffering — see [troubleshooting](troubleshooting.md#streaming-prints-nothing) |
-| L03 | `model` matches what you requested. A different value means the gateway rerouted you |
-| L07 | Try a deliberately wrong model name: expect `HTTP 404` or `HTTP 400` with the server's message |
-| L09–L10 | The real catalogue. On vLLM, `CONTEXT` should equal the `--max-model-len` you deployed with — if it does not, the server won the argument |
-| L12 | `n/n models answered`. Anything else is either an embedding/reranker model (fine — read the NOTE) or a broken route (not fine) |
-| L13 | Wire it into your deploy pipeline ahead of the first real request |
-| E01 | `dim` = the model's real width · `\|v\|` = 1.0 for most retrieval models |
-| E02 | Paraphrase ≫ unrelated. A thin margin means the model is a poor fit for your language or domain |
-| E03 | `7/7 passed`. Any FAIL is explained in [troubleshooting](troubleshooting.md#results-that-look-wrong) — treat *batch position* and *L2-normalized* as blockers |
-| E04 | Raise `--batch-size` until throughput stops improving; watch p95/p99 for queueing |
+| L01 | Gerçek bir yanıt · `finish=stop` (`length` ise `-n` sınırına çarptınız) · tek GPU'da küçük bir model için onlarca–yüzlerce tok/s |
+| L02 | Token'lar kademeli beliriyor. Yanıtın tamamı bir anda geliyorsa bir proxy tamponluyordur — [sorun giderme](troubleshooting.md#streaming-hiçbir-şey-yazmıyor) |
+| L03 | `model` istediğinizle aynı. Farklıysa gateway sizi başka yere yönlendirmiş |
+| L07 | Bilerek yanlış bir model adı deneyin: sunucunun mesajıyla `HTTP 404` ya da `HTTP 400` bekleyin |
+| L09–L10 | Gerçek katalog. vLLM'de `CONTEXT`, deploy ettiğiniz `--max-model-len` ile aynı olmalı — değilse tartışmayı sunucu kazanmış |
+| L12 | `n/n model cevap verdi`. Aksi durum ya embedding/reranker modelidir (sorun değil — NOT'u okuyun) ya da bozuk route (sorun) |
+| L13 | İlk gerçek istekten önce deploy hattınıza yerleştirin |
+| L15 | TTFT p95 kullanıcı deneyiminizin bütçesi olmalı. `-c` artırıp çıktı token/s doyduğu ve TTFT p95'in fırladığı noktayı bulun |
+| L17 | Bulduğunuz bütçeyi `--max-ttft-p95` olarak deploy hattına koyun |
+| E01 | `dim` modelin gerçek genişliği · çoğu retrieval modelinde `\|v\|` = 1.0 |
+| E02 | Paraphrase ≫ alakasız. Dar bir fark, modelin diliniz ya da alanınız için zayıf olduğunu gösterir |
+| E03 | `7/7 geçti`. Her FAIL [sorun giderme](troubleshooting.md#sonuçlar-yanlış-görünüyor) sayfasında açıklanıyor — *batch pozisyonu* ve *L2-normalize* düşerse blocker sayın |
+| E04 | `--batch-size` değerini throughput artmayı bırakana kadar yükseltin; kuyruk için p95/p99'a bakın |
 
-Record your results with the same table shape and open a PR — verified numbers
-from real backends are exactly what
-[compatibility.md](compatibility.md) is for.
+Sonuçlarınızı aynı tablo biçiminde kaydedip PR açın — gerçek backend'lerden
+gelen doğrulanmış rakamlar tam olarak
+[compatibility.md](compatibility.md) dosyasının beklediği şey.

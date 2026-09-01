@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Send a single prompt to an OpenAI-compatible /v1/chat/completions endpoint
-# (vLLM, llama.cpp server, TGI OpenAI shim, Ollama, OpenAI, gateways).
+# OpenAI uyumlu bir /v1/chat/completions endpoint'ine tek prompt gonderir
+# (vLLM, llama.cpp server, TGI OpenAI shim, Ollama, OpenAI, gateway'ler).
 #
 #   ./llm-prompt.sh -e http://10.0.0.10:8000 -k sk-xxx -m Qwen/Qwen2.5-7B-Instruct "Merhaba"
 #   LLM_ENDPOINT=... LLM_API_KEY=... LLM_MODEL=... ./llm-prompt.sh --stream "2+2 kac?"
 #
-# Requires: curl, and one of jq (preferred) or python3 for JSON handling.
-# Portable across GNU/Linux, macOS and WSL - no GNU-only flags.
+# Gerekenler: curl ve JSON icin jq (tercih edilir) ya da python3.
+# GNU/Linux, macOS ve WSL uzerinde calisir - GNU'ya ozel parametre kullanmaz.
 
 set -euo pipefail
 
@@ -25,33 +25,33 @@ USER_PROMPT=""
 
 usage() {
     cat <<'EOF'
-Usage: llm-prompt.sh [options] "prompt"
+Kullanım: llm-prompt.sh [seçenekler] "prompt"
 
-  -e, --endpoint URL     Base URL, .../v1 or full .../v1/chat/completions
+  -e, --endpoint URL     Temel URL, .../v1 ya da tam .../v1/chat/completions
                          (env: LLM_ENDPOINT)
   -k, --api-key KEY      Bearer token (env: LLM_API_KEY)
-  -m, --model NAME       Model name (env: LLM_MODEL)
-  -s, --system TEXT      System prompt
-  -t, --temperature N    Default 0.0
-  -n, --max-tokens N     Default 512
-      --timeout N        Total request timeout in seconds, default 300
-      --stream           Stream tokens as they arrive (SSE)
-      --raw              Print the full JSON response
-  -i, --insecure         Skip TLS verification (self-signed endpoints)
-  -v, --verbose          Print token usage, latency and tok/s to stderr
-  -h, --help             This text
+  -m, --model AD         Model adı (env: LLM_MODEL)
+  -s, --system METİN     System prompt
+  -t, --temperature N    Varsayılan 0.0
+  -n, --max-tokens N     Varsayılan 512
+      --timeout N        Toplam istek zaman aşımı (saniye), varsayılan 300
+      --stream           Token'ları geldikçe yazdır (SSE)
+      --raw              Tam JSON yanıtını yazdır
+  -i, --insecure         TLS doğrulamasını atla (self-signed endpoint)
+  -v, --verbose          Token kullanımı, gecikme ve tok/s bilgisini stderr'e yaz
+  -h, --help             Bu metin
 
-Prompt can also be piped:  echo "..." | llm-prompt.sh -m foo
+Prompt pipe ile de verilebilir:  echo "..." | llm-prompt.sh -m foo
 EOF
 }
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
 
-# Milliseconds since the epoch. GNU date understands %N, BSD/macOS date does
-# not, so fall back to bash 5's $EPOCHREALTIME, then python3, then whole seconds.
+# Epoch'tan beri gecen milisaniye. GNU date %N anlar, BSD/macOS date anlamaz;
+# once bash 5'in $EPOCHREALTIME'i, sonra python3, en sonda tam saniye kullanilir.
 now_ms() {
     if [[ -n "${EPOCHREALTIME:-}" ]]; then
-        local t="${EPOCHREALTIME/,/.}"   # some locales format with a comma
+        local t="${EPOCHREALTIME/,/.}"   # bazi locale'ler virgul kullanir
         printf '%s' "$(( ${t%%.*} * 1000 + 10#${t#*.} / 1000 ))"
         return
     fi
@@ -81,29 +81,29 @@ while [[ $# -gt 0 ]]; do
         -v|--verbose)     VERBOSE=true; shift ;;
         -h|--help)        usage; exit 0 ;;
         --)               shift; USER_PROMPT="$*"; break ;;
-        -*)               die "Unknown option: $1" ;;
+        -*)               die "Bilinmeyen seçenek: $1" ;;
         *)                USER_PROMPT="$1"; shift ;;
     esac
 done
 
-# Prompt from stdin when not given as an argument and stdin is not a tty
+# Parametre verilmediyse ve stdin bir tty degilse prompt'u stdin'den al
 if [[ -z "$USER_PROMPT" && ! -t 0 ]]; then
     USER_PROMPT="$(cat)"
 fi
 
-command -v curl >/dev/null 2>&1 || die "curl not found (apt install curl)"
-[[ -n "$ENDPOINT"    ]] || die "endpoint required (-e or \$LLM_ENDPOINT)"
-[[ -n "$API_KEY"     ]] || die "api key required (-k or \$LLM_API_KEY)"
-[[ -n "$MODEL"       ]] || die "model required (-m or \$LLM_MODEL)"
-[[ -n "$USER_PROMPT" ]] || die "prompt required (argument or stdin)"
+command -v curl >/dev/null 2>&1 || die "curl bulunamadı (apt install curl)"
+[[ -n "$ENDPOINT"    ]] || die "endpoint gerekli (-e ya da \$LLM_ENDPOINT)"
+[[ -n "$API_KEY"     ]] || die "api key gerekli (-k ya da \$LLM_API_KEY)"
+[[ -n "$MODEL"       ]] || die "model gerekli (-m ya da \$LLM_MODEL)"
+[[ -n "$USER_PROMPT" ]] || die "prompt gerekli (parametre ya da stdin)"
 
 HAVE_JQ=false
 command -v jq >/dev/null 2>&1 && HAVE_JQ=true
 if ! $HAVE_JQ && ! command -v python3 >/dev/null 2>&1; then
-    die "need jq or python3 for JSON handling (apt install jq)"
+    die "JSON için jq ya da python3 gerekli (apt install jq)"
 fi
 
-# --- endpoint normalization -------------------------------------------------
+# --- endpoint normalizasyonu ------------------------------------------------
 url="${ENDPOINT%/}"
 case "$url" in
     */chat/completions) : ;;
@@ -111,7 +111,7 @@ case "$url" in
     *)                  url="$url/v1/chat/completions" ;;
 esac
 
-# --- request body -----------------------------------------------------------
+# --- istek govdesi ----------------------------------------------------------
 build_body() {
     if $HAVE_JQ; then
         jq -nc \
@@ -161,9 +161,9 @@ $INSECURE && curl_opts+=(--insecure)
 
 $VERBOSE && printf 'POST %s\n%s\n' "$url" "$body" >&2
 
-# --- streaming path ---------------------------------------------------------
-# awk (not "grep --line-buffered | sed -u") so the pipeline also streams on
-# macOS/BSD, where those GNU flags do not exist.
+# --- streaming yolu ---------------------------------------------------------
+# "grep --line-buffered | sed -u" yerine awk: bu GNU parametreleri macOS/BSD'de
+# yok, awk ile pipeline orada da satir satir akiyor.
 if $STREAM; then
     if $HAVE_JQ; then
         printf '%s' "$body" | curl "${curl_opts[@]}" --no-buffer \
@@ -203,11 +203,11 @@ for line in sys.stdin:
     exit 0
 fi
 
-# --- non-streaming path -----------------------------------------------------
+# --- streaming olmayan yol --------------------------------------------------
 start_ms="$(now_ms)"
-# Append the HTTP status on its own trailing line so it can be split off.
+# HTTP status'u en sona ayri bir satir olarak ekle, sonra ayirip okuyalim.
 resp="$(printf '%s' "$body" | curl "${curl_opts[@]}" --write-out $'\n%{http_code}' "$url")" || {
-    die "curl failed (exit $?) for $url"
+    die "curl başarısız (exit $?): $url"
 }
 elapsed_ms=$(( $(now_ms) - start_ms ))
 
@@ -226,7 +226,7 @@ fi
 
 if $HAVE_JQ; then
     content="$(printf '%s' "$payload" | jq -er '.choices[0].message.content' 2>/dev/null)" || {
-        printf 'Unexpected response body:\n%s\n' "$payload" >&2; exit 1; }
+        printf 'Beklenmeyen yanıt gövdesi:\n%s\n' "$payload" >&2; exit 1; }
     printf '%s\n' "$content"
     if $VERBOSE; then
         printf '%s' "$payload" | jq -r --argjson ms "$elapsed_ms" '
@@ -247,7 +247,7 @@ try:
     data = json.loads(os.environ["RESP_JSON"])
     print(data["choices"][0]["message"]["content"])
 except (ValueError, KeyError, IndexError):
-    sys.stderr.write("Unexpected response body:\n" + os.environ["RESP_JSON"] + "\n")
+    sys.stderr.write("Beklenmeyen yanıt gövdesi:\n" + os.environ["RESP_JSON"] + "\n")
     sys.exit(1)
 if os.environ["VERBOSE"] == "true":
     u = data.get("usage") or {}
