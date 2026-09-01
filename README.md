@@ -26,6 +26,44 @@ jump host'tan sorulur:
 Buradaki her betik bu sorulardan birini **SDK, virtualenv ve paket kurulumu
 olmadan** yanıtlar — sadece `curl` + `jq`, .NET ya da Python standart kütüphanesi.
 
+## İki seviye: basit ve gelişmiş
+
+**Sadece "çalışıyor mu?" diye soruyorsanız** tek komut yeter:
+
+```bash
+bash/llm-check.sh                # Linux · macOS · WSL
+```
+```powershell
+.\powershell\Test-LlmEndpoint.ps1   # Windows
+```
+
+```
+PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  kimlik doğrulama  bearer token kabul edildi
+PASS  model             listede var
+PASS  chat              yanıt geldi · 16 token · finish=stop
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe k"
+PASS  streaming         11 chunk · 322ms
+
+Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
+```
+
+Hepsi geçtiyse exit `0`, en az bir hata varsa `1`. Cron için `-q` / `-Quiet`
+yalnızca son satırı yazar.
+
+**Detay istiyorsanız** aynı komuta `--full` ekleyin (model yoklama + embeddings
+sağlık paketi + kısa yük testi), ya da doğrudan uzmanlaşmış betiklere geçin:
+
+| Ne öğrenmek istiyorsunuz | Basit | Gelişmiş |
+| --- | --- | --- |
+| Endpoint ayakta mı? | `llm-check.sh` | `llm-check.sh --full` |
+| Ne servis ediliyor? | `llm-models.sh` | `llm-models.sh -l --probe` |
+| Model ne cevap veriyor? | `llm-prompt.sh "Merhaba"` | `llm-prompt.sh -v --stream --raw` |
+| Ne kadar hızlı? | `chat-loadtest.py -n 10` | `chat-loadtest.py -n 200 -c 16 --csv` |
+| Embedding'ler sağlam mı? | `embed-test.py "metin"` | `embed-test.py --suite --bench 200` |
+
+Ayrıntı: [docs/health-check.md](docs/health-check.md).
+
 ## Nereden başlamalı — işletim sisteminizi seçin
 
 Her runbook, testleri **komut + üretmesi gereken birebir çıktı** olarak listeler;
@@ -37,6 +75,7 @@ hepsi gerçekten çalıştırılıp doğrulanmıştır, hafızadan yazılmamış
 | Windows | **[docs/runbook-windows.md](docs/runbook-windows.md)** | `powershell\Invoke-LlmPrompt.ps1` |
 
 Referans dokümanlar:
+[sağlık kontrolü](docs/health-check.md) ·
 [chat completions](docs/chat-completions.md) ·
 [model keşfi](docs/models.md) ·
 [yük testi ve TTFT](docs/loadtest.md) ·
@@ -48,6 +87,8 @@ Referans dokümanlar:
 
 | Betik | Çalışma ortamı | API | Ne yapar |
 | --- | --- | --- | --- |
+| [`bash/llm-check.sh`](bash/llm-check.sh) | Bash 3.2+, `curl`, `jq` *ya da* `python3` | hepsi | **Basit giriş noktası:** erişim, auth, model, chat, UTF-8, streaming — `--full` ile derin kontroller |
+| [`powershell/Test-LlmEndpoint.ps1`](powershell/Test-LlmEndpoint.ps1) | PowerShell 5.1 veya 7+ | hepsi | Aynısı; `curl.exe` gerekmez |
 | [`bash/llm-prompt.sh`](bash/llm-prompt.sh) | Bash 3.2+, `curl`, `jq` *ya da* `python3` | `/v1/chat/completions` | Tek prompt, isteğe bağlı SSE streaming, token kullanımı / gecikme / tok-s |
 | [`powershell/Invoke-LlmPrompt.ps1`](powershell/Invoke-LlmPrompt.ps1) | PowerShell 5.1 veya 7+ | `/v1/chat/completions` | Aynısı; `curl.exe` gerekmez, Windows'ta TLS 1.2 ve UTF-8 sorunlarını çözer |
 | [`bash/llm-models.sh`](bash/llm-models.sh) | Bash 3.2+, `curl`, `jq` *ya da* `python3` | `/v1/models` | Ne servis edildiğini listeler, filtreler, doğrular; her modeli yoklayıp gerçekten cevap vereni bulur |
@@ -63,10 +104,10 @@ Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, s
 
 | Ortam | Bash betikleri | PowerShell betikleri | Python betikleri | Sonuç |
 | --- | --- | --- | --- | --- |
-| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 36/36 |
-| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 36/36 |
-| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 22/22 |
-| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 36/36 |
+| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 46/46 |
+| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 46/46 |
+| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 27/27 |
+| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 46/46 |
 
 Embedding sağlık paketi **üç platformda da birebir aynı cosine değerlerini**
 döndürüyor; runbook'lardaki beklenen değerleri yazmaya değer kılan da bu.
@@ -97,6 +138,8 @@ export LLM_ENDPOINT=http://127.0.0.1:8899
 export LLM_API_KEY=sk-mock
 export LLM_MODEL=mock-model
 
+bash/llm-check.sh                            # çalışıyor mu? (basit)
+bash/llm-check.sh --full                     # ne kadar iyi çalışıyor? (gelişmiş)
 bash/llm-models.sh -l                        # ne servis ediliyor?
 bash/llm-models.sh --probe                   # hangileri gerçekten cevap veriyor?
 bash/llm-prompt.sh "Merhaba, kendini tanıt"
@@ -110,6 +153,8 @@ $env:LLM_ENDPOINT = 'http://127.0.0.1:8899'
 $env:LLM_API_KEY  = 'sk-mock'
 $env:LLM_MODEL    = 'mock-model'
 
+.\powershell\Test-LlmEndpoint.ps1
+.\powershell\Test-LlmEndpoint.ps1 -Full
 .\powershell\Get-LlmModels.ps1 -Long
 .\powershell\Get-LlmModels.ps1 -Probe
 .\powershell\Invoke-LlmPrompt.ps1 "Merhaba, kendini tanıt"
@@ -120,10 +165,10 @@ python python\chat-loadtest.py -n 20 -c 4
 ### 2. Gerçek bir endpoint'e karşı
 
 ```bash
-chmod +x bash/llm-prompt.sh bash/llm-models.sh python/embed-test.py python/chat-loadtest.py
+chmod +x bash/*.sh python/*.py
 
-# 1. çağıracağınız modelin gerçekten orada olduğunu doğrulayın
-bash/llm-models.sh -e http://10.0.0.10:8000 -k "$MY_KEY" --has Qwen/Qwen2.5-7B-Instruct
+# 1. önce basit kontrol: buradan geçmiyorsa gerisini denemeye gerek yok
+bash/llm-check.sh -e http://10.0.0.10:8000 -k "$MY_KEY" -m Qwen/Qwen2.5-7B-Instruct
 
 # 2. çağırın
 bash/llm-prompt.sh \
@@ -197,6 +242,15 @@ gateway'ler (`https://gw.example.com/team-a/v1`) olduğu gibi çalışır.
 
 ## Özellik matrisi
 
+Sağlık kontrolü betikleri:
+
+| | `llm-check.sh` | `Test-LlmEndpoint.ps1` |
+| --- | --- | --- |
+| Basit mod (6 kontrol) | ✅ | ✅ |
+| Gelişmiş mod | ✅ `--full` | ✅ `-Full` |
+| Tek satır çıktı | ✅ `-q` | ✅ `-Quiet` |
+| Hata varsa exit 1 | ✅ | ✅ |
+
 Chat betikleri:
 
 | | `llm-prompt.sh` | `Invoke-LlmPrompt.ps1` |
@@ -247,7 +301,7 @@ PASS  bash: --probe bozuk modeli yakalıyor       MODEL       STATUS    LATENCY 
 PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
 PASS  python: sağlık paketi                      PASS  batch içinde dim tutarlı               dim=128
 ...
-36 geçti, 0 başarısız, 0 atlandı/uyarı
+46 geçti, 0 başarısız, 0 atlandı/uyarı
 ```
 
 Kurulu olmayan çalışma ortamları `FAIL` değil `SKIP` olarak raporlanır, böylece
@@ -258,6 +312,7 @@ koşuyor — yukarıdaki platform iddiaları test ediliyor, varsayılmıyor.
 
 - [x] `/v1/models` keşif yardımcısı — [docs/models.md](docs/models.md)
 - [x] Chat için TTFT'li yük testi — [docs/loadtest.md](docs/loadtest.md)
+- [x] Basit/gelişmiş iki seviyeli sağlık kontrolü — [docs/health-check.md](docs/health-check.md)
 - [ ] Reranker endpoint'i (`/v1/rerank`) sağlık kontrolleri
 - [ ] Function calling ve structured output uyumluluk testleri
 - [ ] Python'suz Windows makineleri için yerel PowerShell embeddings betiği

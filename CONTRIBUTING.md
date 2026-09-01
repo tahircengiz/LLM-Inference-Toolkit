@@ -17,6 +17,9 @@ aşağıdaki kısıtlar onu kilitli bir jump host'ta kullanılabilir kılan şey
    kullanılıyor.
 5. **Kodda, örneklerde ve dokümanda anahtar ya da iç hostname olmaz.**
    `10.0.0.10`, `example.com`, `sk-xxx` kullanın.
+6. **Her betik iki seviyelidir.** Parametresiz çalıştırıldığında o alanın en
+   basit sorusunu yanıtlamalı ("çalışıyor mu?"); detay parametrelerin arkasında
+   durmalı. Yeni bir betik, kullanıcıyı önce kılavuz okumaya zorlamamalı.
 
 ## Dil ve kodlama
 

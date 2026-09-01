@@ -103,6 +103,13 @@ def main():
     srv = mock_server.build_server(port=port)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = "http://127.0.0.1:%d" % port
+
+    # Yalnızca doğru anahtarı kabul eden ikinci bir sunucu: 401 yolunu test eder.
+    auth_port = free_port()
+    auth_srv = mock_server.build_server(port=auth_port, key="sk-dogru")
+    threading.Thread(target=auth_srv.serve_forever, daemon=True).start()
+    auth_base = "http://127.0.0.1:%d" % auth_port
+
     print("sahte sunucu: %s/v1\n" % base)
 
     env = dict(os.environ)
@@ -159,7 +166,24 @@ def main():
             [bash, models_script, "--probe"], env,
             expect=["ok", "503", "1/3 model cevap verdi"], want_code=1)
 
-        # endpoint normalization: base, /v1 and the full path must all work
+        check_script = os.path.join(ROOT, "bash", "llm-check.sh")
+        run("bash: sağlık kontrolü (basit)", [bash, check_script], env,
+            expect=["endpoint sağlıklı", "erişim", "chat", "UTF-8", "streaming"])
+        run("bash: sağlık kontrolü --full", [bash, check_script, "--full"], env,
+            expect=["embeddings", "yük", "endpoint sağlıklı"])
+        proc = run("bash: sağlık kontrolü -q tek satır", [bash, check_script, "-q"], env,
+                   expect=["Sonuç:"])
+        if proc and proc.returncode == 0 and len(proc.stdout.strip().splitlines()) != 1:
+            record("bash: -q gerçekten tek satır", "FAIL",
+                   "%d satır yazıldı" % len(proc.stdout.strip().splitlines()))
+        run("bash: sağlık kontrolü yanlış modeli yakalıyor",
+            [bash, check_script, "-m", "olmayan-model"], env,
+            expect=["SAĞLIKSIZ"], want_code=1)
+        run("bash: sağlık kontrolü yanlış anahtarı yakalıyor",
+            [bash, check_script, "-e", auth_base, "-k", "sk-yanlis"], env,
+            expect=["kimlik doğrulama", "SAĞLIKSIZ"], want_code=1)
+
+        # endpoint normalizasyonu: temel URL, /v1 ve tam path - üçü de çalışmalı
         for suffix in ("/v1", "/v1/chat/completions"):
             e2 = dict(env, LLM_ENDPOINT=base + suffix)
             run("bash: endpoint %s" % suffix, [bash, bash_script, "Merhaba"],
@@ -209,6 +233,21 @@ def main():
         run("powershell: --probe bozuk modeli yakalıyor", psrun + ["-Probe"], env,
             expect=["ok", "503"], want_code=1)
 
+        ps_check = os.path.join(ROOT, "powershell", "Test-LlmEndpoint.ps1")
+        pscheck = [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_check]
+        run("powershell: sağlık kontrolü (basit)", pscheck, env,
+            expect=["endpoint sağlıklı", "erişim", "chat", "UTF-8", "streaming"])
+        run("powershell: sağlık kontrolü -Full", pscheck + ["-Full"], env,
+            expect=["embeddings", "yük", "endpoint sağlıklı"])
+        run("powershell: sağlık kontrolü -Quiet", pscheck + ["-Quiet"], env,
+            expect=["Sonuç:"])
+        run("powershell: sağlık kontrolü yanlış modeli yakalıyor",
+            pscheck + ["-Model", "olmayan-model"], env,
+            expect=["SAĞLIKSIZ"], want_code=1)
+        run("powershell: sağlık kontrolü yanlış anahtarı yakalıyor",
+            pscheck + ["-Endpoint", auth_base, "-ApiKey", "sk-yanlis"], env,
+            expect=["kimlik doğrulama", "SAĞLIKSIZ"], want_code=1)
+
     # ---- python embeddings ----------------------------------------------
     run("python: tek metin embed", [py, embed_script, "merhaba dünya"],
         env, expect=["dim=", "|v|="])
@@ -254,6 +293,7 @@ def main():
         e_bad, want_code=1)
 
     srv.shutdown()
+    auth_srv.shutdown()
 
     failed = [r for r in results if r[1] == "FAIL"]
     passed = [r for r in results if r[1] == "PASS"]

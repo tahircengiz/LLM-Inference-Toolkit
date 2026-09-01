@@ -140,5 +140,8 @@ ekler, bazı gateway'ler yönlendirme bilgisi koyar.
 | **LiteLLM / gateway'ler** | Upstream model adları değil, sizin sanal alias'larınız. Bir alias listede olup route edilmemiş olabilir — `--probe` tam da bunu yakalar |
 | **OpenAI** | Anahtarınızın görebildiği tüm katalog; uzun olur, önce filtreleyin |
 
+Sadece "endpoint çalışıyor mu?" diye soruyorsanız
+[sağlık kontrolü](health-check.md) tek komutta bu betiği de çağırır.
+
 Doğrulanmış komut–çıktı çiftleri runbook'larda:
 [Linux](runbook-linux.md#model-keşfi) · [Windows](runbook-windows.md#model-keşfi).

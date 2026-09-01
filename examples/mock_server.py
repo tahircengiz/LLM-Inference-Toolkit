@@ -136,7 +136,8 @@ class Handler(BaseHTTPRequestHandler):
         if not self.server.require_key:
             return True
         auth = self.headers.get("Authorization", "")
-        if auth.startswith("Bearer ") and auth[7:].strip():
+        token = auth[7:].strip() if auth.startswith("Bearer ") else ""
+        if token and (self.server.key is None or token == self.server.key):
             return True
         self._error(401, "Authorization başlığı eksik ya da hatalı", "authentication_error")
         return False
@@ -264,10 +265,23 @@ class Handler(BaseHTTPRequestHandler):
                     "usage": {"prompt_tokens": tokens, "total_tokens": tokens}})
 
 
-def build_server(host="127.0.0.1", port=8899, require_key=True, delay=0.0, verbose=False):
-    srv = ThreadingHTTPServer((host, port), Handler)
+class MockServer(ThreadingHTTPServer):
+    """İstemcinin bağlantıyı erken kapatması normaldir (stream'i yarıda bırakmak,
+    `head` ile kesmek gibi); bunun için traceback basmıyoruz."""
+
+    def handle_error(self, request, client_address):
+        hata = sys.exc_info()[1]
+        if isinstance(hata, (ConnectionResetError, BrokenPipeError)):
+            return
+        ThreadingHTTPServer.handle_error(self, request, client_address)
+
+
+def build_server(host="127.0.0.1", port=8899, require_key=True, delay=0.0,
+                 verbose=False, key=None):
+    srv = MockServer((host, port), Handler)
     srv.daemon_threads = True
     srv.require_key = require_key
+    srv.key = key            # None: herhangi bir boş olmayan token kabul edilir
     srv.delay = delay
     srv.verbose = verbose
     return srv
@@ -280,10 +294,12 @@ def main():
     p.add_argument("--delay", type=float, default=0.0,
                    help="yanıt başına yapay gecikme (saniye)")
     p.add_argument("--no-auth", action="store_true", help="anahtarsız istekleri kabul et")
+    p.add_argument("--key", help="yalnızca bu bearer token'ı kabul et (401 yolunu test etmek için)")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()
 
-    srv = build_server(args.host, args.port, not args.no_auth, args.delay, args.verbose)
+    srv = build_server(args.host, args.port, not args.no_auth, args.delay,
+                       args.verbose, args.key)
     print("OpenAI uyumlu sahte sunucu: http://%s:%d/v1  (model: %s, durdurmak için Ctrl-C)"
           % (args.host, args.port, MODEL_ID))
     try:

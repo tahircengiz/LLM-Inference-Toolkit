@@ -11,9 +11,9 @@ Windows kullanıyorsanız: [runbook-windows.md](runbook-windows.md).
 
 | Ortam | Kabuk | Python | curl / jq | Sonuç |
 | --- | --- | --- | --- | --- |
-| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 36/36 |
-| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 36/36 |
-| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 36/36 |
+| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 46/46 |
+| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 46/46 |
+| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 46/46 |
 
 Bash 3.2 bilinçli bir hedef: macOS'un getirdiği sürüm o, orada çalışan her şey
 modern Linux'ta da çalışır.
@@ -23,7 +23,7 @@ modern Linux'ta da çalışır.
 ```bash
 git clone https://github.com/tahircengiz/LLM-Inference-Toolkit.git
 cd LLM-Inference-Toolkit
-chmod +x bash/llm-prompt.sh bash/llm-models.sh python/embed-test.py python/chat-loadtest.py
+chmod +x bash/*.sh python/*.py
 
 # 1. terminal - aşağıdaki beklenen değerleri üreten sahte sunucu
 python3 examples/mock_server.py --port 8899
@@ -38,10 +38,107 @@ export LLM_EMBED_MODEL=mock-model
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```bash
-python3 tests/smoke_test.py          # beklenen: 36 geçti, 0 başarısız
+python3 tests/smoke_test.py          # beklenen: 46 geçti, 0 başarısız
 ```
 
 ---
+
+## Basit kontroller
+
+Tek komut, öğrenilecek parametre yok. "Endpoint çalışıyor mu?" sorusunun yanıtı.
+
+### B1 — Sağlık kontrolü
+
+```bash
+bash/llm-check.sh
+```
+
+```
+Endpoint  http://127.0.0.1:8899/v1
+Model     mock-model
+
+PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  kimlik doğrulama  bearer token kabul edildi
+PASS  model             listede var
+PASS  chat              yanıt geldi · 16 token · finish=stop
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe k"
+PASS  streaming         11 chunk · 322ms
+
+Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
+```
+
+**Geçti sayılır:** exit `0` · altı satırın altısı da `PASS` · son satırda
+`endpoint sağlıklı`.
+**Değişen:** streaming süresi, toplam süre ve UTF-8 satırındaki yanıt önizlemesi.
+
+Her kontrolün ne sorduğu: [health-check.md](health-check.md#basit-altı-kontrol-tek-komut).
+
+### B2 — Gelişmiş mod
+
+```bash
+bash/llm-check.sh --full
+```
+
+```
+UYARI model yoklama     1/3 model cevap verdi (detay: llm-models.sh --probe)
+PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 5ms, prompt_tokens=36)
+PASS  yük               10/10 istek · TTFT p95 86ms · 65 token/s
+
+Sonuç: 8/9 geçti · 1 uyarı · endpoint sağlıklı (2.5s)
+```
+
+**Geçti sayılır:** exit `0` · basit kontrollerin altı satırı + üç gelişmiş satır ·
+`model yoklama` **UYARI** — çünkü sahte sunucu bilerek çalışmayan bir model
+yayınlıyor; gerçek bir endpoint'te `3/3 model cevap verdi` beklenir.
+**Değişen:** bütün zaman değerleri.
+
+`UYARI` exit kodunu değiştirmez; yalnızca `FAIL` değiştirir.
+
+### B3 — Tek satır (cron / CI)
+
+```bash
+bash/llm-check.sh -q; echo "exit=$?"
+```
+
+```
+Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
+exit=0
+```
+
+**Geçti sayılır:** **tam olarak bir satır** çıktı ve exit `0`.
+
+### B4 — Sorunlu endpoint'ler
+
+```bash
+bash/llm-check.sh -m olmayan-model -q;       echo "exit=$?"
+bash/llm-check.sh -e http://127.0.0.1:9 -q;  echo "exit=$?"
+```
+
+```
+Sonuç: 5/6 geçti · 1 hata · 0 uyarı · endpoint SAĞLIKSIZ (0.5s)
+exit=1
+Sonuç: endpoint erişilemiyor · http://127.0.0.1:9/v1
+exit=1
+```
+
+Yanlış anahtarla (yalnızca doğru anahtarı kabul eden bir sunucuya karşı):
+
+```
+FAIL  erişim            HTTP 401
+FAIL  kimlik doğrulama  Authorization başlığı eksik ya da hatalı
+...
+Sonuç: 0/6 geçti · 4 hata · 2 uyarı · endpoint SAĞLIKSIZ (0.1s)
+```
+
+**Geçti sayılır:** üç senaryoda da exit `1` · bağlantı kurulamadığında betik
+gerisini denemeden duruyor · 401 hem `erişim` hem `kimlik doğrulama` satırında
+görünüyor.
+
+---
+
+## Gelişmiş kontroller
+
+Buradan aşağısı, bir sorunun nerede olduğunu bulmak ya da rakam üretmek için.
 
 ## Chat completions
 
@@ -502,6 +599,8 @@ Sahte sunucunun sabit değerleri yerine beklenecekler:
 
 | Test | Gerçek sunucuda beklenen |
 | --- | --- |
+| B1 | `6/6 geçti`. Buradan geçmiyorsa gerisini denemeye gerek yok |
+| B2 | `model yoklama` satırında `n/n model cevap verdi`; embedding modeli varsa `7/7 geçti` |
 | L01 | Gerçek bir yanıt · `finish=stop` (`length` ise `-n` sınırına çarptınız) · tek GPU'da küçük bir model için onlarca–yüzlerce tok/s |
 | L02 | Token'lar kademeli beliriyor. Yanıtın tamamı bir anda geliyorsa bir proxy tamponluyordur — [sorun giderme](troubleshooting.md#streaming-hiçbir-şey-yazmıyor) |
 | L03 | `model` istediğinizle aynı. Farklıysa gateway sizi başka yere yönlendirmiş |

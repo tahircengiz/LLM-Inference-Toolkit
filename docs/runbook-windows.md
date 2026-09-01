@@ -11,7 +11,7 @@ Linux / macOS / WSL kullanıyorsanız: [runbook-linux.md](runbook-linux.md).
 
 | Ortam | PowerShell | Python | Sonuç |
 | --- | --- | --- | --- |
-| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 22/22 (Bash testleri tasarım gereği atlanır) |
+| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 27/27 (Bash testleri tasarım gereği atlanır) |
 | macOS üzerinde PowerShell 7.6.3 (yerel) | 7.6.3 | 3.9.6 | ✅ |
 | Windows PowerShell 5.1 | 5.1 | — | ⚠️ destekleniyor, CI kapsamında değil — bildirimlere açığız |
 
@@ -48,12 +48,113 @@ powershell -ExecutionPolicy Bypass -File .\powershell\Invoke-LlmPrompt.ps1 "Merh
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```powershell
-python tests\smoke_test.py     # beklenen: 22 geçti, 0 başarısız, 1 atlandı
+python tests\smoke_test.py     # beklenen: 27 geçti, 0 başarısız, 1 atlandı
 ```
 
 Atlanan, Bash betiğidir — Windows'ta PowerShell olanı kullanılır.
 
 ---
+
+## Basit kontroller
+
+Tek komut, öğrenilecek parametre yok. "Endpoint çalışıyor mu?" sorusunun yanıtı.
+
+### B1 — Sağlık kontrolü
+
+```powershell
+.\powershell\Test-LlmEndpoint.ps1
+```
+
+```
+Endpoint  http://127.0.0.1:8899/v1
+Model     mock-model
+
+PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  kimlik doğrulama  bearer token kabul edildi
+PASS  model             listede var
+PASS  chat              yanıt geldi · 16 token · finish=stop
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe kar"
+PASS  streaming         10 chunk · 315ms
+
+Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
+```
+
+**Geçti sayılır:** exit `0` · altı satırın altısı da `PASS` · son satırda
+`endpoint sağlıklı`.
+**Değişen:** streaming süresi, toplam süre ve UTF-8 satırındaki yanıt önizlemesi.
+
+Her kontrolün ne sorduğu: [health-check.md](health-check.md#basit-altı-kontrol-tek-komut).
+
+### B2 — Gelişmiş mod
+
+```powershell
+.\powershell\Test-LlmEndpoint.ps1 -Full
+```
+
+```
+UYARI model yoklama     1/3 model cevap verdi (detay: Get-LlmModels.ps1 -Probe)
+PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 5ms, prompt_tokens=36)
+PASS  yük               10/10 istek · TTFT p95 67ms · 66 token/s
+
+Sonuç: 8/9 geçti · 1 uyarı · endpoint sağlıklı (2.7s)
+```
+
+**Geçti sayılır:** exit `0` · basit kontrollerin altı satırı + üç gelişmiş satır ·
+`model yoklama` **UYARI** — çünkü sahte sunucu bilerek çalışmayan bir model
+yayınlıyor; gerçek bir endpoint'te `3/3 model cevap verdi` beklenir.
+**Değişen:** bütün zaman değerleri.
+
+`UYARI` exit kodunu değiştirmez; yalnızca `FAIL` değiştirir. Embeddings satırı
+`LLM_EMBED_MODEL` tanımlı değilse ya da `python` bulunamazsa atlanır.
+
+### B3 — Tek satır (zamanlanmış görev / CI)
+
+```powershell
+pwsh -NoProfile -File .\powershell\Test-LlmEndpoint.ps1 -Quiet
+$LASTEXITCODE
+```
+
+```
+Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
+0
+```
+
+**Geçti sayılır:** **tam olarak bir satır** çıktı ve exit `0`.
+
+### B4 — Sorunlu endpoint'ler
+
+```powershell
+pwsh -NoProfile -File .\powershell\Test-LlmEndpoint.ps1 -Model olmayan-model -Quiet
+$LASTEXITCODE
+pwsh -NoProfile -File .\powershell\Test-LlmEndpoint.ps1 -Endpoint http://127.0.0.1:9 -Quiet
+$LASTEXITCODE
+```
+
+```
+Sonuç: 5/6 geçti · 1 hata · 0 uyarı · endpoint SAĞLIKSIZ (0.3s)
+1
+Sonuç: endpoint erişilemiyor · http://127.0.0.1:9/v1
+1
+```
+
+Yanlış anahtarla (yalnızca doğru anahtarı kabul eden bir sunucuya karşı):
+
+```
+FAIL  erişim            HTTP 401
+FAIL  kimlik doğrulama  Authorization başlığı eksik ya da hatalı
+...
+Sonuç: 0/6 geçti · 4 hata · 2 uyarı · endpoint SAĞLIKSIZ (0.0s)
+```
+
+**Geçti sayılır:** üç senaryoda da exit `1` · bağlantı kurulamadığında betik
+gerisini denemeden duruyor · 401 hem `erişim` hem `kimlik doğrulama` satırında
+görünüyor. Çıktı Bash betiğiyle satır satır aynıdır.
+
+---
+
+## Gelişmiş kontroller
+
+Buradan aşağısı, bir sorunun nerede olduğunu bulmak ya da rakam üretmek için.
 
 ## Chat completions
 
@@ -413,7 +514,7 @@ $env:LLM_MODEL       = 'Qwen/Qwen2.5-7B-Instruct'
 $env:LLM_EMBED_MODEL = 'BAAI/bge-m3'
 ```
 
-Ardından W01–W16'yı tekrarlayın. Beklentiler Linux runbook'undaki
+Ardından B1–B4 ve W01–W16'yı tekrarlayın. Beklentiler Linux runbook'undaki
 [gerçek endpoint tablosuyla](runbook-linux.md#gerçek-bir-endpointe-karşı) aynıdır.
 
 Windows'a özgü dikkat edilecekler:
