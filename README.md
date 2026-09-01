@@ -33,14 +33,40 @@ package install** — `curl` + `jq`, .NET, or the Python standard library.
 | [`bash/llm-prompt.sh`](bash/llm-prompt.sh) | Bash 3.2+, `curl`, `jq` *or* `python3` | `/v1/chat/completions` | Single prompt, optional SSE streaming, token usage / latency / tok-s |
 | [`powershell/Invoke-LlmPrompt.ps1`](powershell/Invoke-LlmPrompt.ps1) | PowerShell 5.1 or 7+ | `/v1/chat/completions` | Same, with no `curl.exe` dependency; handles TLS 1.2 and UTF-8 on Windows PowerShell |
 | [`python/embed-test.py`](python/embed-test.py) | Python 3.8+ (stdlib only) | `/v1/embeddings` | Embed text, cosine pairs, a 7-check sanity suite, and a concurrency benchmark |
-| [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (stdlib only) | both | A fake OpenAI-compatible server so you can try everything with no GPU |
+| [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (stdlib only) | both | A fake OpenAI-compatible server so you can try everything with no GPU — including reproducible HTTP errors via `-m error-404` |
 | [`tests/smoke_test.py`](tests/smoke_test.py) | Python 3.8+ (stdlib only) | — | Runs every script above against the mock; skips runtimes you don't have |
 
-Full flag reference and recipes:
-**[docs/chat-completions.md](docs/chat-completions.md)** ·
-**[docs/embeddings.md](docs/embeddings.md)** ·
-**[docs/compatibility.md](docs/compatibility.md)** ·
-**[docs/troubleshooting.md](docs/troubleshooting.md)**
+## Start here — pick your OS
+
+Each runbook lists every test as **a command plus the exact output it should
+produce**, verified on a real run rather than written from memory.
+
+| You are on | Runbook | Chat script |
+| --- | --- | --- |
+| Linux · macOS · WSL | **[docs/runbook-linux.md](docs/runbook-linux.md)** | `bash/llm-prompt.sh` |
+| Windows | **[docs/runbook-windows.md](docs/runbook-windows.md)** | `powershell\Invoke-LlmPrompt.ps1` |
+
+Reference material:
+[flag reference](docs/chat-completions.md) ·
+[embeddings guide](docs/embeddings.md) ·
+[backend compatibility](docs/compatibility.md) ·
+[troubleshooting](docs/troubleshooting.md)
+
+## Verified on
+
+Every push runs the full suite on three operating systems. These are results,
+not intentions:
+
+| Environment | Chat (Bash) | Chat (PowerShell) | Embeddings | Result |
+| --- | --- | --- | --- | --- |
+| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 19/19 |
+| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 19/19 |
+| `windows-latest` — pwsh 7.6.5, Python 3.14 | skipped by design | ✅ | ✅ | 11/11 |
+| macOS 26.5 local — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 19/19 |
+
+The embeddings sanity suite returns **identical cosine values on all three
+platforms**, which is what makes the expected values in the runbooks worth
+writing down.
 
 ## Requirements
 
@@ -181,8 +207,18 @@ python3 tests/smoke_test.py          # every script, against the bundled mock
 python3 tests/smoke_test.py -v       # plus each command's output
 ```
 
-CI runs the same file on Ubuntu, macOS and Windows on every push, so the
-cross-platform claims above are checked rather than asserted.
+```
+PASS  bash: chat (blocking)                      Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
+PASS  bash: chat (streaming)                     ...
+PASS  powershell: chat (blocking)                ...
+PASS  python: sanity suite                       PASS  dim consistent across batch            dim=128
+...
+19 passed, 0 failed, 0 skipped/warned
+```
+
+Runtimes you do not have are reported as `SKIP`, not `FAIL`, so the same file
+works everywhere. CI runs it on Ubuntu, macOS and Windows on every push —
+the cross-platform claims above are checked, not asserted.
 
 ## Roadmap
 

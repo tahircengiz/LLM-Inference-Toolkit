@@ -68,7 +68,8 @@ Set-StrictMode -Version Latest
 
 foreach ($p in 'Endpoint', 'ApiKey', 'Model') {
     if ([string]::IsNullOrWhiteSpace((Get-Variable $p -ValueOnly))) {
-        throw "-$p is required (or set `$env:LLM_$($p.ToUpper())`)."
+        [Console]::Error.WriteLine("-$p is required (or set `$env:LLM_$($p.ToUpper())`).")
+        exit 1
     }
 }
 
@@ -78,6 +79,14 @@ function Resolve-ChatUri {
     if ($u -match '/chat/completions$') { return $u }
     if ($u -match '/v1$') { return "$u/chat/completions" }
     return "$u/v1/chat/completions"
+}
+
+function Write-Fail {
+    # Bash-equivalent failure output: a plain stderr line, then exit 1. Avoids
+    # PowerShell's multi-line error block so both scripts can be diffed.
+    param([string]$Message)
+    [Console]::Error.WriteLine($Message)
+    exit 1
 }
 
 function Test-HasProperty {
@@ -146,8 +155,7 @@ if ($Stream) {
 
         if (-not $resp.IsSuccessStatusCode) {
             $errBody = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-            Write-Error ("Request failed (HTTP {0}):`n{1}" -f [int]$resp.StatusCode, $errBody)
-            exit 1
+            Write-Fail ("HTTP {0} from {1}`n{2}" -f [int]$resp.StatusCode, $uri, $errBody)
         }
 
         $responseStream = $resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
@@ -172,8 +180,7 @@ if ($Stream) {
         [Console]::Out.Write("`n")
     }
     catch {
-        Write-Error ("Streaming request failed: {0}" -f $_.Exception.Message)
-        exit 1
+        Write-Fail ("Streaming request failed for {0}: {1}" -f $uri, $_.Exception.Message)
     }
     finally {
         if ($reader) { $reader.Dispose() }
@@ -216,9 +223,10 @@ catch {
         $errBody = $reader.ReadToEnd()
         $reader.Dispose()
     }
-    Write-Error ("Request failed{0}: {1}`n{2}" -f `
-        $(if ($status) { " (HTTP $status)" } else { '' }), $_.Exception.Message, $errBody)
-    exit 1
+    if ($status) {
+        Write-Fail ("HTTP {0} from {1}`n{2}" -f $status, $uri, $errBody)
+    }
+    Write-Fail ("Request failed for {0}: {1}" -f $uri, $_.Exception.Message)
 }
 $sw.Stop()
 
@@ -228,10 +236,10 @@ $text = [Text.Encoding]::UTF8.GetString($resp.RawContentStream.ToArray())
 if ($Raw) { $text; exit 0 }
 
 try { $obj = $text | ConvertFrom-Json }
-catch { Write-Error "Non-JSON response:`n$text"; exit 1 }
+catch { Write-Fail "Non-JSON response:`n$text" }
 
 if (-not (Test-HasProperty $obj 'choices') -or -not $obj.choices) {
-    Write-Error "No 'choices' in response:`n$text"; exit 1
+    Write-Fail "Unexpected response body:`n$text"
 }
 
 $obj.choices[0].message.content
@@ -241,7 +249,10 @@ if ((Test-HasProperty $obj 'usage') -and $obj.usage) {
     $tps = if ($sw.Elapsed.TotalSeconds -gt 0) {
         [math]::Round($obj.usage.completion_tokens / $sw.Elapsed.TotalSeconds, 1)
     } else { 0 }
-    Write-Verbose ("prompt={0} completion={1} total={2} | {3}s | {4} tok/s | finish={5}" -f `
+    # InvariantCulture: a tr-TR host would otherwise print "0,02s" and break
+    # anything downstream that parses this line.
+    Write-Verbose ([string]::Format([cultureinfo]::InvariantCulture,
+        "prompt={0} completion={1} total={2} | {3}s | {4} tok/s | finish={5}",
         $obj.usage.prompt_tokens, $obj.usage.completion_tokens, $obj.usage.total_tokens,
-        $sec, $tps, $obj.choices[0].finish_reason)
+        $sec, $tps, $obj.choices[0].finish_reason))
 }

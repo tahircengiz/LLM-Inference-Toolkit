@@ -150,10 +150,13 @@ def main():
     if not pwsh:
         record("powershell/Invoke-LlmPrompt.ps1", "SKIP", "pwsh/powershell not found")
     else:
-        # Windows consoles routinely mangle non-ASCII on the way to a pipe;
-        # that is a console problem, not a script problem, so keep it soft.
-        soft = [TURKISH_MARKER] if IS_WINDOWS else []
-        hard = [ASCII_MARKER] + ([] if IS_WINDOWS else [TURKISH_MARKER])
+        # PowerShell 7 writes UTF-8 to a pipe on every OS, so the Turkish text
+        # is a hard requirement there. Windows PowerShell 5.1 uses the console
+        # code page instead - that is a console limitation, not a script bug,
+        # so only warn.
+        utf8_expected = os.path.basename(pwsh).lower().startswith("pwsh") or not IS_WINDOWS
+        hard = [ASCII_MARKER] + ([TURKISH_MARKER] if utf8_expected else [])
+        soft = [] if utf8_expected else [TURKISH_MARKER]
         run("powershell: chat (blocking)",
             [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba"],
             env, expect=hard, expect_soft=soft)
