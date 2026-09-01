@@ -157,7 +157,7 @@ Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, s
 | `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
 | `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
 | `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 32/32 |
-| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | ayrı CI işi |
+| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | 32/32 |
 | macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 51/51 |
 
 Embedding sağlık paketi **üç platformda da birebir aynı cosine değerlerini**

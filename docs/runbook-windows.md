@@ -21,10 +21,14 @@ Linux / macOS / WSL kullanıyorsanız: [runbook-linux.md](runbook-linux.md).
 | --- | --- | --- | --- |
 | `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 32/32 (Bash testleri tasarım gereği atlanır) |
 | macOS üzerinde PowerShell 7.6.3 (yerel) | 7.6.3 | 3.9.6 | ✅ |
-| Windows PowerShell 5.1 | 5.1 | — | ⚠️ destekleniyor, CI kapsamında değil — bildirimlere açığız |
+| `windows-latest` (CI, **Windows PowerShell 5.1**) | 5.1 | 3.14.7 | ✅ 32/32 (Bash testleri tasarım gereği atlanır) |
 
 CI, Windows'ta genellikle yanlış giden şeyi doğruluyor: yanıt temiz UTF-8 olarak
 geliyor, yani `çğışöüÇĞİŞÖÜ` gidiş-dönüşten sağ çıkıyor.
+
+**Windows PowerShell 5.1 ayrı bir CI işinde koşuyor.** Kurumsal Windows'ta hâlâ
+varsayılan olan sürüm bu ve TLS, kodlama ve `System.Net.Http` konularında
+pwsh 7'den farklı davranıyor — streaming dahil tüm kontroller orada da geçiyor.
 
 `.ps1` dosyaları UTF-8 **BOM** ile saklanır; PowerShell 5.1 BOM olmadan dosyayı
 sistem kod sayfasıyla okur ve kaynaktaki Türkçe metinleri bozar.
@@ -205,8 +209,8 @@ Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖ�
 usage satırı yok — sunucular streaming sırasında onu göndermez.
 
 Streaming, yanıtın tamamını tamponlayan `Invoke-WebRequest` yerine `HttpClient`
-kullanır. CI'da üç işletim sisteminde de PowerShell 7 üzerinde doğrulanıyor;
-5.1'de `System.Net.Http` gerektiğinde yüklenir.
+kullanır. CI'da hem PowerShell 7 (üç işletim sistemi) hem Windows PowerShell 5.1
+üzerinde doğrulanıyor; 5.1'de `System.Net.Http` gerektiğinde yüklenir.
 
 ### W03 — Ham JSON
 

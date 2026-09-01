@@ -47,8 +47,10 @@ python3 -m compileall -q python examples tests
 PowerShell betiklerine dokunduysanız smoke testi `pwsh` kurulu bir makinede
 çalıştırın; aksi halde PowerShell kontrolleri atlanır.
 
-CI aynı smoke testi Ubuntu, macOS ve Windows'ta koşar; ayrıca ShellCheck ve
-PSScriptAnalyzer'ı error seviyesinde çalıştırır.
+CI aynı smoke testi Ubuntu, macOS, Windows (pwsh 7) ve Windows PowerShell 5.1
+üzerinde koşar; ayrıca ShellCheck ve PSScriptAnalyzer'ı error seviyesinde
+çalıştırır. Hangi katmanın neyi doğruladığı:
+[README → Nerede test ediliyor?](README.md#nerede-test-ediliyor)
 
 ## Doküman yazarken
 

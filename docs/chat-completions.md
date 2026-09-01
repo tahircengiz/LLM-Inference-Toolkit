@@ -83,8 +83,8 @@ de ele alır:
 `-SkipCertificateCheck`'e (streaming sırasında HttpClient doğrulayıcısına) karşılık gelir.
 
 > **Not** — streaming `HttpClient` kullanır, çünkü `Invoke-WebRequest` yanıtın
-> tamamını tamponlayıp öyle döner. CI'da PowerShell 7 üzerinde (Ubuntu, macOS,
-> Windows) doğrulanıyor; 5.1 desteği elden geldiğince sağlanmıştır ve
+> tamamını tamponlayıp öyle döner. CI'da hem PowerShell 7 (Ubuntu, macOS,
+> Windows) hem Windows PowerShell 5.1 üzerinde doğrulanıyor; 5.1'de
 > `System.Net.Http` gerektiğinde yüklenir.
 
 `.ps1` dosyaları UTF-8 **BOM** ile saklanır: 5.1, BOM olmadan dosyayı sistem kod
