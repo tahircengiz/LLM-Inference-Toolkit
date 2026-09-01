@@ -62,13 +62,13 @@ kapısı olarak çalışır.
 | **uzun girdi işlendi** | `max-model-len` üzerinde sunucunun sessizce truncate mi ettiği yoksa 4xx mi döndüğü. İkisi de savunulabilir — ama hangisi olduğunu bilmeniz gerekir |
 
 ```
-PASS  batch içinde dim tutarlı               dim=1024
-PASS  vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
-PASS  çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
-PASS  cos(paraphrase) > cos(alakasız)        para=0.7412 alakasız=0.2688 fark=0.4724
-PASS  cos(aynı metin) ~= 1.0                 cos=1.00000000
-PASS  batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
-PASS  uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=8192
+PASS   batch içinde dim tutarlı               dim=1024
+PASS   vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
+PASS   çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
+PASS   cos(paraphrase) > cos(alakasız)        para=0.7412 alakasız=0.2688 fark=0.4724
+PASS   cos(aynı metin) ~= 1.0                 cos=1.00000000
+PASS   batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
+PASS   uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=8192
 
 7/7 geçti  (dim=1024, ilk çağrı 61ms, prompt_tokens=36)
 ```
@@ -78,6 +78,20 @@ Sondaj metinleri bilerek Türkçedir (bir paraphrase çifti ve alakasız bir cü
 zayıflar ve buradaki dar bir fark, üstüne index kurmadan önce bilinmesi gereken
 bir sinyaldir. Kendi alanınızdan cümleler kullanmak için dosyanın başındaki
 `IDENT` / `PARA` / `UNREL` değerlerini değiştirin.
+
+### PASS / UYARI / FAIL
+
+Sağlık paketi üç durum kullanır:
+
+| Durum | Ne demek | Exit koduna etkisi |
+| --- | --- | --- |
+| `PASS` | Kontrol geçti | — |
+| `UYARI` | Sapma var ama pratikte önemsiz — quantize edilmiş (GGUF) ya da batch'li GPU sunucularında `cos=0.9999` civarı farklar normaldir. Ayrıca "sunucu uzun girdiyi reddetti" gibi geçerli ama bilinmesi gereken davranışlar | **etkilemez** |
+| `FAIL` | Gerçek bir sorun: sapma `cos < 0.999`, sıralama bozuk ya da vektörler normalize değil | exit `1` |
+
+Bu ayrım gerçek bir koşumdan doğdu: quantize bir embedding modeli üç kontrolü
+`FAIL` veriyordu, oysa farklar dördüncü ondalık basamaktaydı. Ayrıntı ve
+doğrulanmış çıktılar: [compatibility.md](compatibility.md#doğrulanmış-gerçek-backend-sonuçları).
 
 ### `--bench` — throughput ve gecikme
 

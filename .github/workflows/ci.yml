@@ -38,6 +38,27 @@ jobs:
       - name: Her betigi sahte sunucuya karsi calistir
         run: python tests/smoke_test.py -v
 
+  # Windows PowerShell 5.1 kurumsal Windows'ta hâlâ varsayılan; pwsh 7'den
+  # ayrı davranır (TLS, kodlama, System.Net.Http). Ayrı bir iş olarak koşuyoruz.
+  windows-powershell-51:
+    name: smoke (Windows PowerShell 5.1)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: PowerShell sürümü
+        shell: powershell
+        run: $PSVersionTable | Format-List
+
+      - name: Betikleri Windows PowerShell 5.1 ile çalıştır
+        env:
+          SMOKE_PWSH: powershell
+        run: python tests/smoke_test.py -v
+
   lint:
     name: lint
     runs-on: ubuntu-latest

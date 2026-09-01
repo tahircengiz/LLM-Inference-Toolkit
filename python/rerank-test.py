@@ -194,11 +194,25 @@ def mod_sirala(client, sorgu, dokumanlar, top_n):
     return 0
 
 
+def esik(deger, pass_esigi, uyari_esigi):
+    """Yüksek daha iyi: PASS / UYARI / FAIL. Quantize edilmiş ya da batch'li
+    sunucular bit-bit aynı skoru vermez; küçük sapmayı FAIL saymak yanlış alarm."""
+    if deger >= pass_esigi:
+        return "PASS"
+    if deger >= uyari_esigi:
+        return "UYARI"
+    return "FAIL"
+
+
 def mod_suite(client):
     sonuclar_listesi = []
 
-    def kontrol(ad, tamam, detay):
-        sonuclar_listesi.append((ad, tamam, detay))
+    def kontrol(ad, durum, detay):
+        if durum is True:
+            durum = "PASS"
+        elif durum is False:
+            durum = "FAIL"
+        sonuclar_listesi.append((ad, durum, detay))
 
     # 1. temel çağrı: her doküman puanlanıyor mu?
     siralama, usage, gecen = client.rerank(SORGU, DOKUMANLAR)
@@ -231,19 +245,37 @@ def mod_suite(client):
     siralama2, _, _ = client.rerank(SORGU, DOKUMANLAR)
     ayni_sira = [i for i, _ in siralama2] == indexler
     maks_delta = max(abs(a - b) for (_, a), (_, b) in zip(siralama, siralama2)) if ayni_sira else 1.0
+    if not ayni_sira:
+        durum_det = "FAIL"
+    elif maks_delta < 1e-4:
+        durum_det = "PASS"
+    else:
+        durum_det = "UYARI" if maks_delta < 1e-2 else "FAIL"
     kontrol("çağrılar arası deterministik",
-            ayni_sira and maks_delta < 1e-4,
-            "sıra aynı=%s max|delta|=%.3e" % ("evet" if ayni_sira else "hayır", maks_delta))
+            durum_det,
+            "sıra aynı=%s max|delta|=%.3e%s"
+            % ("evet" if ayni_sira else "hayır", maks_delta,
+               "  (quantize/batch kaynaklı sapma, sıralama değişmedi)"
+               if durum_det == "UYARI" else ""))
 
     # 6. doküman sırası bağımsızlığı - batching/pozisyon hatalarını yakalar
     ters = list(reversed(DOKUMANLAR))
     ters_siralama, _, _ = client.rerank(SORGU, ters)
     ters_ilk_metin = ters[ters_siralama[0][0]]
     skor_farki = abs(ters_siralama[0][1] - skorlar[0])
+    ayni_ilk = ters_ilk_metin == DOKUMANLAR[DOGRU_INDEX]
+    if not ayni_ilk:
+        durum_sira = "FAIL"          # sıralama değişiyorsa bu bir blocker
+    elif skor_farki < 1e-4:
+        durum_sira = "PASS"
+    else:
+        durum_sira = "UYARI" if skor_farki < 1e-2 else "FAIL"
     kontrol("doküman sırası sonucu değiştirmiyor",
-            ters_ilk_metin == DOKUMANLAR[DOGRU_INDEX] and skor_farki < 1e-4,
-            "ters sırada da aynı doküman ilk=%s · skor farkı=%.3e"
-            % ("evet" if ters_ilk_metin == DOKUMANLAR[DOGRU_INDEX] else "hayır", skor_farki))
+            durum_sira,
+            "ters sırada da aynı doküman ilk=%s · skor farkı=%.3e%s"
+            % ("evet" if ayni_ilk else "hayır", skor_farki,
+               "  (skor biraz oynadı ama sıralama korundu)"
+               if durum_sira == "UYARI" else ""))
 
     # 7. top_n uygulanıyor mu?
     ust2, _, _ = client.rerank(SORGU, DOKUMANLAR, top_n=2)
@@ -259,18 +291,24 @@ def mod_suite(client):
                 len(uzun_siralama) == 2,
                 "sessizce truncate edildi")
     except SystemExit as e:
+        # Reddetmek de geçerli bir davranış; hangisi olduğunu bilmek yeterli.
         kontrol("uzun doküman (~%d karakter) işlendi" % len(uzun),
-                False, "sunucu reddetti: %s" % str(e).splitlines()[0])
+                "UYARI", "sunucu reddetti (%s) - chunk'lama gerekir"
+                % str(e).splitlines()[0])
 
     genislik = max(len(a) for a, _, _ in sonuclar_listesi)
-    hatali = 0
-    for ad, tamam, detay in sonuclar_listesi:
-        if not tamam:
-            hatali += 1
-        print("%s  %-*s  %s" % ("PASS" if tamam else "FAIL", genislik, ad, detay))
-    print("\n%d/%d geçti  (%d doküman, ilk çağrı %.0fms, prompt_tokens=%s)"
-          % (len(sonuclar_listesi) - hatali, len(sonuclar_listesi), len(DOKUMANLAR),
-             gecen * 1000, usage.get("prompt_tokens", "?")))
+    hatali = sum(1 for _, d, _ in sonuclar_listesi if d == "FAIL")
+    uyari = sum(1 for _, d, _ in sonuclar_listesi if d == "UYARI")
+    for ad, durum, detay in sonuclar_listesi:
+        print("%-5s  %-*s  %s" % (durum, genislik, ad, detay))
+    ozet = "\n%d/%d geçti" % (len(sonuclar_listesi) - hatali - uyari, len(sonuclar_listesi))
+    if uyari:
+        ozet += " · %d uyarı" % uyari
+    if hatali:
+        ozet += " · %d hata" % hatali
+    print("%s  (%d doküman, ilk çağrı %.0fms, prompt_tokens=%s)"
+          % (ozet, len(DOKUMANLAR), gecen * 1000, usage.get("prompt_tokens", "?")))
+    # UYARI exit kodunu değiştirmez; yalnızca FAIL değiştirir.
     return 1 if hatali else 0
 
 

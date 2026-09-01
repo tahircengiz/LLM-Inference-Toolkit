@@ -523,13 +523,13 @@ python3 python/embed-test.py --suite; echo "exit=$?"
 ```
 
 ```
-PASS  batch içinde dim tutarlı               dim=128
-PASS  vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
-PASS  çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
-PASS  cos(paraphrase) > cos(alakasız)        para=0.2634 alakasız=-0.0635 fark=0.3269
-PASS  cos(aynı metin) ~= 1.0                 cos=1.00000000
-PASS  batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
-PASS  uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=66000
+PASS   batch içinde dim tutarlı               dim=128
+PASS   vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
+PASS   çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
+PASS   cos(paraphrase) > cos(alakasız)        para=0.2634 alakasız=-0.0635 fark=0.3269
+PASS   cos(aynı metin) ~= 1.0                 cos=1.00000000
+PASS   batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
+PASS   uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=66000
 
 7/7 geçti  (dim=128, ilk çağrı 6ms, prompt_tokens=36)
 exit=0
@@ -645,14 +645,14 @@ python3 python/rerank-test.py --suite; echo "exit=$?"
 ```
 
 ```
-PASS  her doküman puanlandı                    4 doküman gönderildi, 4 sonuç döndü
-PASS  index'ler geçerli ve benzersiz           index'ler=[1, 3, 2, 0]
-PASS  sonuçlar skora göre azalan sıralı        skorlar=0.6338, 0.5525, 0.5517, 0.4121
-PASS  ilgili doküman ilk sırada                ilk=index 1 · fark=0.0813
-PASS  çağrılar arası deterministik             sıra aynı=evet max|delta|=0.000e+00
-PASS  doküman sırası sonucu değiştirmiyor      ters sırada da aynı doküman ilk=evet · skor farkı=0.000e+00
-PASS  top_n uygulanıyor                        top_n=2 için 2 sonuç döndü
-PASS  uzun doküman (~132000 karakter) işlendi  sessizce truncate edildi
+PASS   her doküman puanlandı                    4 doküman gönderildi, 4 sonuç döndü
+PASS   index'ler geçerli ve benzersiz           index'ler=[1, 3, 2, 0]
+PASS   sonuçlar skora göre azalan sıralı        skorlar=0.6338, 0.5525, 0.5517, 0.4121
+PASS   ilgili doküman ilk sırada                ilk=index 1 · fark=0.0813
+PASS   çağrılar arası deterministik             sıra aynı=evet max|delta|=0.000e+00
+PASS   doküman sırası sonucu değiştirmiyor      ters sırada da aynı doküman ilk=evet · skor farkı=0.000e+00
+PASS   top_n uygulanıyor                        top_n=2 için 2 sonuç döndü
+PASS   uzun doküman (~132000 karakter) işlendi  sessizce truncate edildi
 
 8/8 geçti  (4 doküman, ilk çağrı 6ms, prompt_tokens=61)
 exit=0

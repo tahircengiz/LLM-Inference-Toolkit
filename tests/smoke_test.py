@@ -191,7 +191,10 @@ def main():
                 e2, expect=[ASCII_MARKER])
 
     # ---- powershell ------------------------------------------------------
-    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    # SMOKE_PWSH ile hangi PowerShell'in kullanılacağı zorlanabilir; CI bunu
+    # Windows PowerShell 5.1'i de test etmek için kullanıyor.
+    pwsh = (os.environ.get("SMOKE_PWSH") or shutil.which("pwsh")
+            or shutil.which("powershell"))
     if not pwsh:
         record("powershell/Invoke-LlmPrompt.ps1", "SKIP", "pwsh/powershell bulunamadı")
     else:

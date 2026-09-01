@@ -126,6 +126,28 @@ Referans dokümanlar:
 | [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (yalnızca stdlib) | hepsi | GPU'suz denemek için sahte OpenAI uyumlu sunucu — `-m error-404` ile tekrarlanabilir HTTP hataları da üretir |
 | [`tests/smoke_test.py`](tests/smoke_test.py) | Python 3.8+ (yalnızca stdlib) | — | Yukarıdaki her betiği sahte sunucuya karşı çalıştırır; kurulu olmayan ortamları atlar |
 
+## Nerede test ediliyor?
+
+Üç ayrı katman var; hangisinin neyi doğruladığını bilmek önemli:
+
+| Katman | Nerede | Neye karşı | Ne doğrular |
+| --- | --- | --- | --- |
+| **1. Smoke** | GitHub Actions: `ubuntu-latest`, `macos-latest`, `windows-latest` + Windows PowerShell 5.1 · her push'ta | Birlikte gelen [sahte sunucu](examples/mock_server.py) | Betiklerin kendisi: parametreler, çıktı biçimi, exit kodları, UTF-8, hata yolları. Hızlı ve tekrarlanabilir |
+| **2. Lint** | GitHub Actions: `ubuntu-latest` | — | ShellCheck + PSScriptAnalyzer (error seviyesi) + Python derleme |
+| **3. Gerçek backend** | Elle, kendi altyapınızda | Gerçek bir inference sunucusu | Sunucunun gerçekten nasıl davrandığı. Sonuçlar [compatibility.md](docs/compatibility.md#doğrulanmış-gerçek-backend-sonuçları) dosyasına yazılır |
+
+**1. ve 2. katman otomatiktir**; sahte sunucu sayesinde GPU, model ya da ağ
+gerekmez, bu yüzden her push'ta çalışabilir. **3. katman elle yapılır**, çünkü
+her kurulumun endpoint'i farklıdır — ve asıl sürprizlerin çıktığı yer orasıdır:
+sağlık paketinin eşikleri, gerçek bir quantize modelde yanlış alarm verdiği
+görüldükten sonra kalibre edildi.
+
+Kendi endpoint'inize karşı çalıştırmak için:
+
+```bash
+bash/llm-check.sh -e http://SUNUCU:PORT -k ANAHTAR -m MODEL --full
+```
+
 ## Doğrulandığı ortamlar
 
 Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, sonuç:
@@ -135,6 +157,7 @@ Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, s
 | `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
 | `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
 | `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 32/32 |
+| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | ayrı CI işi |
 | macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 51/51 |
 
 Embedding sağlık paketi **üç platformda da birebir aynı cosine değerlerini**
@@ -233,13 +256,13 @@ python3 python/embed-test.py -e http://10.0.0.10:8001 -k "$MY_KEY" -m BAAI/bge-m
 ```
 
 ```
-PASS  batch içinde dim tutarlı               dim=1024
-PASS  vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
-PASS  çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
-PASS  cos(paraphrase) > cos(alakasız)        para=0.7412 alakasız=0.2688 fark=0.4724
-PASS  cos(aynı metin) ~= 1.0                 cos=1.00000000
-PASS  batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
-PASS  uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=8192
+PASS   batch içinde dim tutarlı               dim=1024
+PASS   vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
+PASS   çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
+PASS   cos(paraphrase) > cos(alakasız)        para=0.7412 alakasız=0.2688 fark=0.4724
+PASS   cos(aynı metin) ~= 1.0                 cos=1.00000000
+PASS   batch pozisyonu vektörü değiştirmiyor  cos(pos0)=1.00000000 cos(pos3)=1.00000000
+PASS   uzun girdi (~264000 karakter) işlendi  sessizce truncate edildi, prompt_tokens=8192
 ```
 
 ## Yapılandırma
@@ -329,7 +352,7 @@ python3 tests/smoke_test.py -v       # ek olarak her komutun çıktısı
 PASS  bash: chat (bloklayan)                     Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 PASS  bash: --probe bozuk modeli yakalıyor       MODEL       STATUS    LATENCY  NOT
 PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
-PASS  python: sağlık paketi                      PASS  batch içinde dim tutarlı               dim=128
+PASS  python: sağlık paketi                      PASS   batch içinde dim tutarlı               dim=128
 ...
 51 geçti, 0 başarısız, 0 atlandı/uyarı
 ```

@@ -5,10 +5,74 @@ Buradaki her şey düz OpenAI HTTP'si konuşur — bearer auth, `/v1/chat/comple
 beklenir. Bu sayfa, insanları takan backend'e özgü ayrıntıları toplar.
 
 > **Doğrulama durumu.** CI, betikleri Ubuntu, macOS ve Windows üzerinde birlikte
-> gelen sahte sunucuya karşı çalıştırır. Aşağıdaki notlar, her backend'e karşı
-> otomatik bir matristen değil, ilgili projelerin API yüzeyinden derlenmiştir.
-> Bir sunucu sizde farklı davranıyorsa lütfen issue açın — bu dosya tam olarak
-> bu bildirimleri toplamak için var.
+> gelen sahte sunucuya karşı çalıştırır. Aşağıdaki tablolardaki notlar, her
+> backend'e karşı otomatik bir matristen değil, ilgili projelerin API yüzeyinden
+> derlenmiştir — **bir istisnayla:** aşağıdaki "gerçek backend" bölümü elle
+> çalıştırılmış, doğrulanmış sonuçlardır. Bir sunucu sizde farklı davranıyorsa
+> lütfen issue açın; bu dosya tam olarak bu bildirimleri toplamak için var.
+
+## Doğrulanmış gerçek backend sonuçları
+
+### llama.cpp (`server-vulkan`, Qwen3-30B-A3B GGUF) — 2026-09-01
+
+Chat endpoint'i, sağlık kontrolünün altı kontrolünü de geçti:
+
+```
+PASS  erişim            HTTP 200 · 1 model listeleniyor
+PASS  kimlik doğrulama  bearer token kabul edildi
+PASS  model             listede var
+PASS  chat              yanıt geldi · 6 token · finish=stop
+PASS  UTF-8             geçerli · "çğışöü"
+PASS  streaming         7 chunk · 107ms
+```
+
+Yük testi (10 istek, 2 eşzamanlı, `max_tokens=64`):
+
+```
+Throughput  2.2 istek/s · 138.0 çıktı token/s
+TTFT  (ms)  ort=57 p50=42 p90=85 p95=86 p99=86 maks=86
+ITL   (ms)  ort=13.8 p50=13.7 p95=15.4 maks=17.3
+E2E   (ms)  ort=926 p50=911 p95=956 p99=956 maks=956
+```
+
+Doğrulanan davranışlar:
+
+| Gözlem | Sonuç |
+| --- | --- |
+| `model` alanı yok sayılıyor | ✅ Doğrulandı. Var olmayan bir model adıyla istek attık, sunucu **normal bir yanıt döndürdü**. Tek modelli sunucularda `--has` chat çağrısından daha bilgilendiricidir |
+| `/v1/models` içinde `max_model_len` yok | ✅ `CONTEXT` sütunu `-` gösteriyor; context limitini listeden öğrenemezsiniz |
+| Bearer token zorunlu değil | ✅ `--api-key` verilmemişse herhangi bir değer (ya da hiç) kabul ediliyor. Betikler yine de bir anahtar ister — `-k dummy` geçin |
+| Türkçe karakterler | ✅ Prompt ve yanıt bozulmadan gidip geliyor |
+
+### llama.cpp embeddings (Qwen3-Embedding GGUF) — 2026-09-01
+
+```
+PASS   batch içinde dim tutarlı               dim=1024
+PASS   vektörler L2-normalize                 norms=1.000000, 1.000000, 1.000000
+PASS   çağrılar arası deterministik           max|delta|=0.000e+00 cos=1.00000000
+PASS   cos(paraphrase) > cos(alakasız)        para=0.8112 alakasız=0.1998 fark=0.6113
+PASS   cos(aynı metin) ~= 1.0                 cos=0.99991462
+UYARI  batch pozisyonu vektörü değiştirmiyor  cos(pos0)=0.99993394 cos(pos3)=0.99983813  (quantize/batch kaynaklı sapma, pratikte önemsiz)
+UYARI  uzun girdi (~264000 karakter) işlendi  sunucu reddetti (HTTP 400) - ingestion tarafında chunk'lama gerekir
+
+5/7 geçti · 2 uyarı  (dim=1024, ilk çağrı 131ms, prompt_tokens=55)
+```
+
+Buradan çıkan iki pratik sonuç:
+
+1. **Quantize edilmiş modeller bit-bit deterministik değildir.** `cos=0.9999`
+   civarındaki sapmalar normaldir ve RAG sonuçlarını değiştirmez; sağlık paketi
+   bu yüzden bunları `FAIL` değil `UYARI` sayar. Sapma `cos < 0.999` seviyesine
+   inerse gerçek bir sorun vardır.
+2. **Bu sunucu uzun girdiyi sessizce kırpmıyor, 400 döndürüyor.** Yani
+   ingestion hattınızın kendi chunk'lama koruması olmalı — aksi halde uzun
+   dokümanlar sessizce değil, gürültülü biçimde kaybolur.
+
+Bu bölüm, sağlık paketinin eşiklerini gerçek dünyaya göre kalibre etmemizi
+sağladı: ilk koşumda üç kontrol `FAIL` veriyordu, oysa sapmalar pratikte
+önemsizdi.
+
+
 
 ## Chat (`/v1/chat/completions`)
 

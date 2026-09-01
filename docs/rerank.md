@@ -96,14 +96,14 @@ python3 python/rerank-test.py --suite
 ```
 
 ```
-PASS  her doküman puanlandı                    4 doküman gönderildi, 4 sonuç döndü
-PASS  index'ler geçerli ve benzersiz           index'ler=[1, 3, 2, 0]
-PASS  sonuçlar skora göre azalan sıralı        skorlar=0.6338, 0.5525, 0.5517, 0.4121
-PASS  ilgili doküman ilk sırada                ilk=index 1 · fark=0.0813
-PASS  çağrılar arası deterministik             sıra aynı=evet max|delta|=0.000e+00
-PASS  doküman sırası sonucu değiştirmiyor      ters sırada da aynı doküman ilk=evet · skor farkı=0.000e+00
-PASS  top_n uygulanıyor                        top_n=2 için 2 sonuç döndü
-PASS  uzun doküman (~132000 karakter) işlendi  sessizce truncate edildi
+PASS   her doküman puanlandı                    4 doküman gönderildi, 4 sonuç döndü
+PASS   index'ler geçerli ve benzersiz           index'ler=[1, 3, 2, 0]
+PASS   sonuçlar skora göre azalan sıralı        skorlar=0.6338, 0.5525, 0.5517, 0.4121
+PASS   ilgili doküman ilk sırada                ilk=index 1 · fark=0.0813
+PASS   çağrılar arası deterministik             sıra aynı=evet max|delta|=0.000e+00
+PASS   doküman sırası sonucu değiştirmiyor      ters sırada da aynı doküman ilk=evet · skor farkı=0.000e+00
+PASS   top_n uygulanıyor                        top_n=2 için 2 sonuç döndü
+PASS   uzun doküman (~132000 karakter) işlendi  sessizce truncate edildi
 
 8/8 geçti  (4 doküman, ilk çağrı 6ms, prompt_tokens=61)
 ```
@@ -126,6 +126,20 @@ gözle görülür şekilde zayıflar. Kendi alanınızdan cümlelerle çalışma
 dosyanın başındaki `SORGU` / `DOKUMANLAR` / `DOGRU_INDEX` değerlerini değiştirin.
 
 ---
+
+### PASS / UYARI / FAIL
+
+Sağlık paketi üç durum kullanır:
+
+| Durum | Ne demek | Exit koduna etkisi |
+| --- | --- | --- |
+| `PASS` | Kontrol geçti | — |
+| `UYARI` | Sapma var ama pratikte önemsiz — quantize edilmiş (GGUF) ya da batch'li GPU sunucularında `cos=0.9999` civarı farklar normaldir. Ayrıca "sunucu uzun girdiyi reddetti" gibi geçerli ama bilinmesi gereken davranışlar | **etkilemez** |
+| `FAIL` | Gerçek bir sorun: sapma `cos < 0.999`, sıralama bozuk ya da vektörler normalize değil | exit `1` |
+
+Bu ayrım gerçek bir koşumdan doğdu: quantize bir embedding modeli üç kontrolü
+`FAIL` veriyordu, oysa farklar dördüncü ondalık basamaktaydı. Ayrıntı ve
+doğrulanmış çıktılar: [compatibility.md](compatibility.md#doğrulanmış-gerçek-backend-sonuçları).
 
 ## Gelişmiş: `--bench`
 

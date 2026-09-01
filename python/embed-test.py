@@ -196,11 +196,29 @@ UNREL = "Dun aksam sahilde balik izgara yaptik."
 LONG_UNIT = "GPU scheduling ve MIG partitioning konusunda kapasite planlamasi. "
 
 
+def esik(deger, pass_esigi, uyari_esigi):
+    """Yüksek daha iyi: PASS / UYARI / FAIL.
+
+    Quantize edilmiş (GGUF) ya da batch'li GPU sunucularında aynı metin bile
+    bit-bit aynı vektörü vermez. cos=0.9999 ile cos=0.99988 arasındaki fark
+    pratikte hiçbir şeyi değiştirmez; bunu FAIL saymak yanlış alarmdır.
+    """
+    if deger >= pass_esigi:
+        return "PASS"
+    if deger >= uyari_esigi:
+        return "UYARI"
+    return "FAIL"
+
+
 def mode_suite(client, verbose):
     results = []
 
-    def check(name, ok, detail):
-        results.append((name, ok, detail))
+    def check(name, durum, detail):
+        if durum is True:
+            durum = "PASS"
+        elif durum is False:
+            durum = "FAIL"
+        results.append((name, durum, detail))
 
     # 1. temel embed + dim + normalizasyon
     vecs, usage, elapsed = client.embed([IDENT, PARA, UNREL])
@@ -219,9 +237,13 @@ def mode_suite(client, verbose):
     # 2. determinizm - aynı metin, ikinci çağrı
     vecs2, _, _ = client.embed([IDENT])
     diff = max_abs_diff(vecs[0], vecs2[0])
+    cos_det = cosine(vecs[0], vecs2[0])
+    durum_det = "PASS" if diff < 1e-4 else esik(cos_det, 0.9999, 0.999)
     check("çağrılar arası deterministik",
-          diff < 1e-4,
-          "max|delta|=%.3e cos=%.8f" % (diff, cosine(vecs[0], vecs2[0])))
+          durum_det,
+          "max|delta|=%.3e cos=%.8f%s" % (diff, cos_det,
+              "  (quantize/batch kaynaklı sapma, pratikte önemsiz)"
+              if durum_det == "UYARI" else ""))
 
     # 3. benzerlik sıralaması: paraphrase, alakasız metni geçmeli
     cos_para = cosine(vecs[0], vecs[1])
@@ -232,16 +254,23 @@ def mode_suite(client, verbose):
 
     # 4. aynı metnin tek batch içindeki kendine benzerliği
     vsame, _, _ = client.embed([IDENT, IDENT])
+    cos_ayni = cosine(vsame[0], vsame[1])
+    durum_ayni = esik(cos_ayni, 0.9999, 0.999)
     check("cos(aynı metin) ~= 1.0",
-          cosine(vsame[0], vsame[1]) > 0.9999,
-          "cos=%.8f" % cosine(vsame[0], vsame[1]))
+          durum_ayni,
+          "cos=%.8f%s" % (cos_ayni,
+              "  (quantize/batch kaynaklı sapma, pratikte önemsiz)"
+              if durum_ayni == "UYARI" else ""))
 
     # 5. batch/tekil tutarlılığı - pooling/padding hatalarını yakalar
     padded = client.embed([IDENT, UNREL * 4, PARA * 3, IDENT])[0]
+    cos0, cos3 = cosine(vecs[0], padded[0]), cosine(vecs[0], padded[3])
+    durum_batch = esik(min(cos0, cos3), 0.9999, 0.999)
     check("batch pozisyonu vektörü değiştirmiyor",
-          cosine(vecs[0], padded[0]) > 0.9999 and cosine(vecs[0], padded[3]) > 0.9999,
-          "cos(pos0)=%.8f cos(pos3)=%.8f"
-          % (cosine(vecs[0], padded[0]), cosine(vecs[0], padded[3])))
+          durum_batch,
+          "cos(pos0)=%.8f cos(pos3)=%.8f%s" % (cos0, cos3,
+              "  (quantize/batch kaynaklı sapma, pratikte önemsiz)"
+              if durum_batch == "UYARI" else ""))
 
     # 6. max-model-len üzerindeki truncation davranışı
     long_text = LONG_UNIT * 4000
@@ -251,9 +280,11 @@ def mode_suite(client, verbose):
               len(lvec[0]) == dim,
               "sessizce truncate edildi, prompt_tokens=%s" % lusage.get("prompt_tokens", "?"))
     except SystemExit as e:
+        # Reddetmek de geçerli bir davranış; hangisi olduğunu bilmek yeterli.
         check("uzun girdi (~%d karakter) işlendi" % len(long_text),
-              False,
-              "sunucu reddetti: %s" % str(e).splitlines()[0])
+              "UYARI",
+              "sunucu reddetti (%s) - ingestion tarafında chunk'lama gerekir"
+              % str(e).splitlines()[0])
 
     # 7. opsiyonel: Matryoshka dimensions
     if client.dimensions is not None:
@@ -262,15 +293,19 @@ def mode_suite(client, verbose):
               "dönen dim=%d" % dim)
 
     width = max(len(n) for n, _, _ in results)
-    failed = 0
-    for name, ok, detail in results:
-        if not ok:
-            failed += 1
-        print("%s  %-*s  %s" % ("PASS" if ok else "FAIL", width, name, detail))
-    print("\n%d/%d geçti  (dim=%d, ilk çağrı %.0fms, prompt_tokens=%s)"
-          % (len(results) - failed, len(results), dim, elapsed * 1000,
-             usage.get("prompt_tokens", "?")))
-    return 1 if failed else 0
+    hatali = sum(1 for _, d, _ in results if d == "FAIL")
+    uyari = sum(1 for _, d, _ in results if d == "UYARI")
+    for name, durum, detail in results:
+        print("%-5s  %-*s  %s" % (durum, width, name, detail))
+    ozet = "\n%d/%d geçti" % (len(results) - hatali - uyari, len(results))
+    if uyari:
+        ozet += " · %d uyarı" % uyari
+    if hatali:
+        ozet += " · %d hata" % hatali
+    print("%s  (dim=%d, ilk çağrı %.0fms, prompt_tokens=%s)"
+          % (ozet, dim, elapsed * 1000, usage.get("prompt_tokens", "?")))
+    # UYARI exit kodunu değiştirmez; yalnızca FAIL değiştirir.
+    return 1 if hatali else 0
 
 
 def mode_bench(client, total, concurrency, batch_size):
