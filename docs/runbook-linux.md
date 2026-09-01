@@ -412,13 +412,14 @@ E2E   (ms)  ort=333 p50=334 p95=347 p99=350 maks=350
 E2E satırlarının üçü de dolu · **TTFT belirgin biçimde ITL'den büyük**.
 **Değişen:** bütün zaman değerleri.
 
-Son madde tesadüf değil: sahte sunucu ilk token'dan önce bilerek üç chunk
-gecikmesi kadar bekler, sonra her chunk arasında bir gecikme koyar. Yani doğru
-çalışan bir ölçümde TTFT ≈ 3 × ITL çıkmalıdır. `tests/smoke_test.py` bunu her
-koşumda kontrol eder — ölçümün iki metriği birbirine karıştırmadığının kanıtı:
+Son madde tesadüf değil: sahte sunucu ilk token'dan önce bilerek bekler
+(`--prefill`), sonra her chunk arasında çok daha kısa bir gecikme koyar. Yani
+doğru çalışan bir ölçümde TTFT, ITL'nin kat kat üstünde çıkmalıdır.
+`tests/smoke_test.py` bunu 400ms prefill + 10ms chunk ayarlı ayrı bir sunucuyla
+her koşumda kontrol eder — ölçümün iki metriği birbirine karıştırmadığının kanıtı:
 
 ```
-PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
+PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=407ms itl_p50=12ms (sunucu 400ms prefill + 10ms chunk)
 ```
 
 ### L16 — Streaming olmadan

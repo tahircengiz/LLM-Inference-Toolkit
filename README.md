@@ -351,7 +351,7 @@ python3 tests/smoke_test.py -v       # ek olarak her komutun çıktısı
 ```
 PASS  bash: chat (bloklayan)                     Merhaba! Bu bir mock yanittir - Türkçe karakter testi: çğışöüÇĞİŞÖÜ
 PASS  bash: --probe bozuk modeli yakalıyor       MODEL       STATUS    LATENCY  NOT
-PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
+PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=407ms itl_p50=12ms (sunucu 400ms prefill + 10ms chunk)
 PASS  python: sağlık paketi                      PASS   batch içinde dim tutarlı               dim=128
 ...
 51 geçti, 0 başarısız, 0 atlandı/uyarı

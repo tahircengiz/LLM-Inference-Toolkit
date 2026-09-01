@@ -301,6 +301,13 @@ function Get-PythonExe {
 if ($Full) {
     if (-not $Quiet) { Write-Output "" }
 
+    # Windows PowerShell 5.1, harici bir programın stderr'ine yazdığı her satırı
+    # ErrorRecord'a çevirir; $ErrorActionPreference='Stop' ile bu, alt betiğin
+    # tamamen normal olan özet satırını ölümcül hataya dönüştürür. Gelişmiş
+    # kontroller boyunca gevşetiyoruz.
+    $eskiEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+
     $env:LLM_ENDPOINT = $baseUri
     $env:LLM_API_KEY = $ApiKey
     $env:LLM_MODEL = $Model
@@ -403,6 +410,8 @@ if ($Full) {
         }
     }
 }
+
+if ($Full) { $ErrorActionPreference = $eskiEAP }
 
 # --- sonuç ------------------------------------------------------------------
 $sw.Stop()

@@ -110,6 +110,14 @@ def main():
     threading.Thread(target=auth_srv.serve_forever, daemon=True).start()
     auth_base = "http://127.0.0.1:%d" % auth_port
 
+    # TTFT/ITL ayrımını ölçmek için belirgin bir prefill'li üçüncü sunucu:
+    # 400ms prefill, 10ms chunk. Yüklü bir CI makinesinde bile TTFT, ITL'nin
+    # kat kat üstünde kalır - kontrol jitter'a takılmaz.
+    ttft_port = free_port()
+    ttft_srv = mock_server.build_server(port=ttft_port, delay=0.01, prefill=0.4)
+    threading.Thread(target=ttft_srv.serve_forever, daemon=True).start()
+    ttft_base = "http://127.0.0.1:%d" % ttft_port
+
     print("sahte sunucu: %s/v1\n" % base)
 
     env = dict(os.environ)
@@ -285,19 +293,20 @@ def main():
     # ---- yük testi -------------------------------------------------------
     load_script = os.path.join(ROOT, "python", "chat-loadtest.py")
     proc = run("python: yük testi (TTFT)",
-               [py, load_script, "-n", "4", "-c", "2", "--json"], env,
+               [py, load_script, "-n", "4", "-c", "2", "--json"],
+               dict(env, LLM_ENDPOINT=ttft_base),
                expect=['"ttft_ms"', '"itl_ms"'])
     if proc and proc.returncode == 0:
-        # Sahte sunucu ilk token'dan önce üç chunk gecikmesi bekler, sonra her
-        # chunk arasında bir gecikme koyar. Yani TTFT, ITL'den belirgin biçimde
-        # büyük olmalı - bu ikisinin ayrı ayrı ve doğru ölçüldüğünü kanıtlar.
+        # Bu sunucu 400ms prefill + 10ms chunk gecikmesiyle çalışıyor. Yani TTFT,
+        # ITL'nin en az birkaç katı çıkmalı - bu, iki metriğin ayrı ayrı ve
+        # doğru ölçüldüğünü kanıtlar.
         try:
             ozet = json.loads(proc.stdout)
             ttft = ozet["ttft_ms"]["p50"]
             itl = ozet["itl_ms"]["p50"]
-            tamam = ttft > 0 and itl > 0 and ttft > itl
+            tamam = ttft > 0 and itl > 0 and ttft > 3 * itl
             record("python: TTFT, ITL'den ayrı ölçülüyor", "PASS" if tamam else "FAIL",
-                   "ttft_p50=%.0fms itl_p50=%.0fms (mock 3 chunk'lık prefill bekler)"
+                   "ttft_p50=%.0fms itl_p50=%.0fms (sunucu 400ms prefill + 10ms chunk)"
                    % (ttft, itl))
         except (ValueError, KeyError, TypeError) as e:
             record("python: TTFT, ITL'den ayrı ölçülüyor", "FAIL", "özet okunamadı: %s" % e)
@@ -316,6 +325,7 @@ def main():
 
     srv.shutdown()
     auth_srv.shutdown()
+    ttft_srv.shutdown()
 
     failed = [r for r in results if r[1] == "FAIL"]
     passed = [r for r in results if r[1] == "PASS"]

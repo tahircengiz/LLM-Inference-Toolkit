@@ -210,10 +210,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "close")
             self.end_headers()
-            # Prefill simülasyonu: ilk token'dan önce üç chunk gecikmesi kadar
-            # bekle; böylece TTFT ile ITL ayrı ve doğrulanabilir sayılar olur.
+            # Prefill simülasyonu: ilk token'dan önce bekle; böylece TTFT ile ITL
+            # ayrı ve doğrulanabilir sayılar olur. Varsayılan üç chunk gecikmesi,
+            # --prefill ile açıkça verilebilir (yüklü makinelerde ölçümün
+            # kırılgan olmaması için testler bunu kullanır).
             chunk_delay = self.server.delay or 0.02
-            time.sleep(chunk_delay * 3)
+            prefill = self.server.prefill
+            if prefill is None:
+                prefill = chunk_delay * 3
+            time.sleep(prefill)
             for piece in REPLY.split(" "):
                 chunk = {"id": "chatcmpl-mock", "object": "chat.completion.chunk",
                          "model": body["model"],
@@ -335,12 +340,13 @@ class MockServer(ThreadingHTTPServer):
 
 
 def build_server(host="127.0.0.1", port=8899, require_key=True, delay=0.0,
-                 verbose=False, key=None):
+                 verbose=False, key=None, prefill=None):
     srv = MockServer((host, port), Handler)
     srv.daemon_threads = True
     srv.require_key = require_key
     srv.key = key            # None: herhangi bir boş olmayan token kabul edilir
     srv.delay = delay
+    srv.prefill = prefill    # None: chunk gecikmesinin üç katı
     srv.verbose = verbose
     return srv
 
@@ -353,11 +359,14 @@ def main():
                    help="yanıt başına yapay gecikme (saniye)")
     p.add_argument("--no-auth", action="store_true", help="anahtarsız istekleri kabul et")
     p.add_argument("--key", help="yalnızca bu bearer token'ı kabul et (401 yolunu test etmek için)")
+    p.add_argument("--prefill", type=float,
+                   help="stream'de ilk token'dan önceki gecikme (saniye); "
+                        "varsayılan chunk gecikmesinin üç katı")
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()
 
     srv = build_server(args.host, args.port, not args.no_auth, args.delay,
-                       args.verbose, args.key)
+                       args.verbose, args.key, args.prefill)
     print("OpenAI uyumlu sahte sunucu: http://%s:%d/v1  (model: %s, durdurmak için Ctrl-C)"
           % (args.host, args.port, MODEL_ID))
     try:

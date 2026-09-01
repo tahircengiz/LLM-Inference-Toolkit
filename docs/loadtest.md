@@ -196,13 +196,13 @@ TTFT  (ms)  ölçülemedi (başarılı istek yok)
 
 ## Ölçümün kendisi nasıl doğrulanıyor?
 
-Sahte sunucu ilk token'dan önce bilerek **üç chunk gecikmesi** kadar bekler,
-sonra her chunk arasında bir gecikme koyar. Yani doğru çalışan bir ölçümde TTFT,
-ITL'den belirgin biçimde büyük çıkmak zorundadır. `tests/smoke_test.py` bunu her
-koşumda kontrol eder:
+Sahte sunucu ilk token'dan önce bilerek bekler (`--prefill`), sonra her chunk
+arasında çok daha kısa bir gecikme koyar. Yani doğru çalışan bir ölçümde TTFT,
+ITL'nin kat kat üstünde çıkmak zorundadır. `tests/smoke_test.py` bunu 400ms
+prefill + 10ms chunk ayarlı ayrı bir sunucuyla her koşumda kontrol eder:
 
 ```
-PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
+PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=407ms itl_p50=12ms (sunucu 400ms prefill + 10ms chunk)
 ```
 
 Bu, "betik çalıştı" demekten farklı bir şeydir: iki metriğin birbirine

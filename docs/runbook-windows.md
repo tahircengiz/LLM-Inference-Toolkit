@@ -447,7 +447,7 @@ E2E   (ms)  ort=333 p50=334 p95=347 p99=350 maks=350
 ```
 
 **Geçti sayılır:** exit `0` · `12 istek · 12 başarılı · 0 hata` · **TTFT belirgin
-biçimde ITL'den büyük** (sahte sunucu ilk token'dan önce üç chunk gecikmesi
+biçimde ITL'den büyük** (sahte sunucu ilk token'dan önce belirgin bir prefill
 bekler, bu ölçümün doğruluğunun kanıtıdır).
 **Değişen:** bütün zaman değerleri.
 
