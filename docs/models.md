@@ -90,7 +90,7 @@ mock-model  ok           16ms
 mock-embed  400          17ms  bu model chat completions desteklemiyor
 error-503   503          17ms  'error-503' modeli için enjekte edilmiş hata
 
-1/3 model cevap verdi
+1/4 model cevap verdi
 ```
 
 Listeleme bir iddiadır, garanti değil. Gateway'ler rutin olarak route edilmemiş,

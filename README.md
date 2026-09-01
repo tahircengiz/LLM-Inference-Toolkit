@@ -38,7 +38,7 @@ bash/llm-check.sh                # Linux · macOS · WSL
 ```
 
 ```
-PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
@@ -61,8 +61,33 @@ sağlık paketi + kısa yük testi), ya da doğrudan uzmanlaşmış betiklere ge
 | Model ne cevap veriyor? | `llm-prompt.sh "Merhaba"` | `llm-prompt.sh -v --stream --raw` |
 | Ne kadar hızlı? | `chat-loadtest.py -n 10` | `chat-loadtest.py -n 200 -c 16 --csv` |
 | Embedding'ler sağlam mı? | `embed-test.py "metin"` | `embed-test.py --suite --bench 200` |
+| Reranker doğru sıralıyor mu? | `rerank-test.py` | `rerank-test.py --suite --bench 100` |
 
 Ayrıntı: [docs/health-check.md](docs/health-check.md).
+
+## Çıktıyı nasıl okumalı
+
+Bütün betikler aynı dili konuşur; bir kez öğrenince hepsi tanıdık gelir.
+
+| İşaret | Anlamı | Exit koduna etkisi |
+| --- | --- | --- |
+| `PASS` | Kontrol geçti | — |
+| `FAIL` | Kontrol düştü, düzeltilmesi gerekir | exit `1` |
+| `UYARI` | Dikkate değer ama sağlıksız saymayan durum — örneğin `/v1/models` uygulamayan tek modelli bir sunucu | **etkilemez** |
+| `SKIP` | Gerekli çalışma ortamı yok (Windows'ta `bash` gibi) | etkilemez |
+
+Üç kural:
+
+1. **Exit kodu `0` ya da `1`'dir.** Her betik doğrudan CI ve cron'da
+   kullanılabilir: `llm-check.sh || alarm_ver`.
+2. **Sonuç stdout'a, tanılama stderr'e gider.** `llm-prompt.sh "..." > cevap.txt`
+   `-v` açıkken bile temiz bir dosya verir.
+3. **Zaman değerleri her koşumda değişir, yapı değişmez.** Runbook'lardaki
+   beklenen çıktılarda hangi satırın sabit hangisinin değişken olduğu tek tek
+   yazılıdır.
+
+Çıktılarda geçen terimler (TTFT, ITL, p95, cosine, L2 norm…) ve **hangi değeri
+görünce ne düşünmeniz gerektiği**: [docs/glossary.md](docs/glossary.md).
 
 ## Nereden başlamalı — işletim sisteminizi seçin
 
@@ -80,8 +105,10 @@ Referans dokümanlar:
 [model keşfi](docs/models.md) ·
 [yük testi ve TTFT](docs/loadtest.md) ·
 [embeddings](docs/embeddings.md) ·
+[rerank](docs/rerank.md) ·
 [backend uyumluluğu](docs/compatibility.md) ·
-[sorun giderme](docs/troubleshooting.md)
+[sorun giderme](docs/troubleshooting.md) ·
+[sözlük](docs/glossary.md)
 
 ## İçindekiler
 
@@ -95,6 +122,7 @@ Referans dokümanlar:
 | [`powershell/Get-LlmModels.ps1`](powershell/Get-LlmModels.ps1) | PowerShell 5.1 veya 7+ | `/v1/models` | Aynısı; nesne döndürür, `Where-Object` / `Export-Csv` ile zincirlenir |
 | [`python/chat-loadtest.py`](python/chat-loadtest.py) | Python 3.8+ (yalnızca stdlib) | `/v1/chat/completions` | TTFT, ITL, uçtan uca gecikme ve throughput ölçen yük testi; SLO kapısı olarak da kullanılır |
 | [`python/embed-test.py`](python/embed-test.py) | Python 3.8+ (yalnızca stdlib) | `/v1/embeddings` | Embed, cosine çiftleri, 7 kontrollük sağlık paketi ve eşzamanlılık benchmark'ı |
+| [`python/rerank-test.py`](python/rerank-test.py) | Python 3.8+ (yalnızca stdlib) | `/v1/rerank` | Sorgu–doküman sıralaması, 8 kontrollük sağlık paketi ve throughput benchmark'ı |
 | [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (yalnızca stdlib) | hepsi | GPU'suz denemek için sahte OpenAI uyumlu sunucu — `-m error-404` ile tekrarlanabilir HTTP hataları da üretir |
 | [`tests/smoke_test.py`](tests/smoke_test.py) | Python 3.8+ (yalnızca stdlib) | — | Yukarıdaki her betiği sahte sunucuya karşı çalıştırır; kurulu olmayan ortamları atlar |
 
@@ -104,10 +132,10 @@ Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, s
 
 | Ortam | Bash betikleri | PowerShell betikleri | Python betikleri | Sonuç |
 | --- | --- | --- | --- | --- |
-| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 46/46 |
-| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 46/46 |
-| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 27/27 |
-| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 46/46 |
+| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
+| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 51/51 |
+| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 32/32 |
+| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 51/51 |
 
 Embedding sağlık paketi **üç platformda da birebir aynı cosine değerlerini**
 döndürüyor; runbook'lardaki beklenen değerleri yazmaya değer kılan da bu.
@@ -146,6 +174,7 @@ bash/llm-prompt.sh "Merhaba, kendini tanıt"
 bash/llm-prompt.sh --stream "Bir haiku yaz"
 python3 python/chat-loadtest.py -n 20 -c 4   # TTFT / ITL / throughput
 python3 python/embed-test.py --suite
+python3 python/rerank-test.py --suite
 ```
 
 ```powershell
@@ -224,6 +253,7 @@ bırakabilirsiniz:
 | `LLM_API_KEY` | hepsi | `-k` / `-ApiKey` |
 | `LLM_MODEL` | hepsi | `-m` / `-Model` |
 | `LLM_EMBED_MODEL` | `embed-test.py` | `-m` (`LLM_MODEL`'den önceliklidir) |
+| `LLM_RERANK_MODEL` | `rerank-test.py` | `-m` (`LLM_MODEL`'den önceliklidir) |
 
 Açıkça verilen parametre her zaman ortam değişkenini ezer. `source` edebileceğiniz
 bir örnek: [`examples/env.example`](examples/env.example).
@@ -301,7 +331,7 @@ PASS  bash: --probe bozuk modeli yakalıyor       MODEL       STATUS    LATENCY 
 PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=71ms itl_p50=27ms (mock 3 chunk'lık prefill bekler)
 PASS  python: sağlık paketi                      PASS  batch içinde dim tutarlı               dim=128
 ...
-46 geçti, 0 başarısız, 0 atlandı/uyarı
+51 geçti, 0 başarısız, 0 atlandı/uyarı
 ```
 
 Kurulu olmayan çalışma ortamları `FAIL` değil `SKIP` olarak raporlanır, böylece
@@ -313,7 +343,7 @@ koşuyor — yukarıdaki platform iddiaları test ediliyor, varsayılmıyor.
 - [x] `/v1/models` keşif yardımcısı — [docs/models.md](docs/models.md)
 - [x] Chat için TTFT'li yük testi — [docs/loadtest.md](docs/loadtest.md)
 - [x] Basit/gelişmiş iki seviyeli sağlık kontrolü — [docs/health-check.md](docs/health-check.md)
-- [ ] Reranker endpoint'i (`/v1/rerank`) sağlık kontrolleri
+- [x] Reranker endpoint'i (`/v1/rerank`) sağlık kontrolleri — [docs/rerank.md](docs/rerank.md)
 - [ ] Function calling ve structured output uyumluluk testleri
 - [ ] Python'suz Windows makineleri için yerel PowerShell embeddings betiği
 

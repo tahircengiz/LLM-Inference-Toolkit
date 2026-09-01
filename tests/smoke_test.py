@@ -164,13 +164,14 @@ def main():
             [bash, models_script, "--has", "no-such-model"], env, want_code=1)
         run("bash: --probe bozuk modeli yakalıyor",
             [bash, models_script, "--probe"], env,
-            expect=["ok", "503", "1/3 model cevap verdi"], want_code=1)
+            expect=["ok", "503", "1/4 model cevap verdi"], want_code=1)
 
         check_script = os.path.join(ROOT, "bash", "llm-check.sh")
         run("bash: sağlık kontrolü (basit)", [bash, check_script], env,
             expect=["endpoint sağlıklı", "erişim", "chat", "UTF-8", "streaming"])
-        run("bash: sağlık kontrolü --full", [bash, check_script, "--full"], env,
-            expect=["embeddings", "yük", "endpoint sağlıklı"])
+        run("bash: sağlık kontrolü --full", [bash, check_script, "--full"],
+            dict(env, LLM_RERANK_MODEL="mock-rerank"),
+            expect=["embeddings", "rerank", "yük", "endpoint sağlıklı"])
         proc = run("bash: sağlık kontrolü -q tek satır", [bash, check_script, "-q"], env,
                    expect=["Sonuç:"])
         if proc and proc.returncode == 0 and len(proc.stdout.strip().splitlines()) != 1:
@@ -237,8 +238,9 @@ def main():
         pscheck = [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_check]
         run("powershell: sağlık kontrolü (basit)", pscheck, env,
             expect=["endpoint sağlıklı", "erişim", "chat", "UTF-8", "streaming"])
-        run("powershell: sağlık kontrolü -Full", pscheck + ["-Full"], env,
-            expect=["embeddings", "yük", "endpoint sağlıklı"])
+        run("powershell: sağlık kontrolü -Full", pscheck + ["-Full"],
+            dict(env, LLM_RERANK_MODEL="mock-rerank"),
+            expect=["embeddings", "rerank", "yük", "endpoint sağlıklı"])
         run("powershell: sağlık kontrolü -Quiet", pscheck + ["-Quiet"], env,
             expect=["Sonuç:"])
         run("powershell: sağlık kontrolü yanlış modeli yakalıyor",
@@ -260,6 +262,23 @@ def main():
         env, expect=["throughput=", "p95="])
     run("python: HTTP hatasını gösteriyor", [py, embed_script, "-m", "error-500", "x"],
         env, want_code=1)
+    # ---- rerank ----------------------------------------------------------
+    rerank_script = os.path.join(ROOT, "python", "rerank-test.py")
+    rerank_env = dict(env, LLM_RERANK_MODEL="mock-rerank")
+    run("python: rerank basit sıralama", [py, rerank_script], rerank_env,
+        expect=["skor", "kubectl label", "Yorum"])
+    run("python: rerank sağlık paketi", [py, rerank_script, "--suite"], rerank_env,
+        expect=["geçti", "ilgili doküman ilk sırada", "doküman sırası sonucu değiştirmiyor"])
+    run("python: rerank kendi verisiyle çalışıyor",
+        [py, rerank_script, "disk alarmı nasıl kurulur",
+         "Prometheus ile disk doluluk alarmı kurma adımları.", "Balık ızgara tarifi."],
+        rerank_env, expect=["Prometheus", "ayrım net"])
+    run("python: rerank throughput benchmark",
+        [py, rerank_script, "--bench", "8", "--concurrency", "2", "--docs", "4"],
+        rerank_env, expect=["throughput=", "p95="])
+    run("python: rerank HTTP hatasını gösteriyor",
+        [py, rerank_script, "-m", "error-503"], rerank_env, want_code=1)
+
     # ---- yük testi -------------------------------------------------------
     load_script = os.path.join(ROOT, "python", "chat-loadtest.py")
     proc = run("python: yük testi (TTFT)",

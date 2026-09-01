@@ -6,12 +6,20 @@ koşumdan birebir kopyalanmıştır. Koşumlar arasında meşru olarak değişen
 (gecikme, tok/s) her testin altında ayrıca belirtilir.
 
 Linux / macOS / WSL kullanıyorsanız: [runbook-linux.md](runbook-linux.md).
+Çıktılardaki terimler için: [sözlük](glossary.md).
+
+**Her test aynı düzendedir:**
+
+> **Komut** → yazacağınız satır
+> **Çıktı** → görmeniz gereken
+> **Geçti sayılır** → neye bakarak "tamam" diyeceğiniz
+> **Değişen** → koşumdan koşuma farklılaşacak kısımlar (genelde süreler)
 
 ## Doğrulanmış ortamlar
 
 | Ortam | PowerShell | Python | Sonuç |
 | --- | --- | --- | --- |
-| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 27/27 (Bash testleri tasarım gereği atlanır) |
+| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 32/32 (Bash testleri tasarım gereği atlanır) |
 | macOS üzerinde PowerShell 7.6.3 (yerel) | 7.6.3 | 3.9.6 | ✅ |
 | Windows PowerShell 5.1 | 5.1 | — | ⚠️ destekleniyor, CI kapsamında değil — bildirimlere açığız |
 
@@ -34,7 +42,8 @@ python examples\mock_server.py --port 8899
 $env:LLM_ENDPOINT    = 'http://127.0.0.1:8899'
 $env:LLM_API_KEY     = 'sk-mock'
 $env:LLM_MODEL       = 'mock-model'
-$env:LLM_EMBED_MODEL = 'mock-model'
+$env:LLM_EMBED_MODEL  = 'mock-embed'
+$env:LLM_RERANK_MODEL = 'mock-rerank'
 ```
 
 Betik başlamıyorsa:
@@ -48,7 +57,7 @@ powershell -ExecutionPolicy Bypass -File .\powershell\Invoke-LlmPrompt.ps1 "Merh
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```powershell
-python tests\smoke_test.py     # beklenen: 27 geçti, 0 başarısız, 1 atlandı
+python tests\smoke_test.py     # beklenen: 32 geçti, 0 başarısız, 1 atlandı
 ```
 
 Atlanan, Bash betiğidir — Windows'ta PowerShell olanı kullanılır.
@@ -69,7 +78,7 @@ Tek komut, öğrenilecek parametre yok. "Endpoint çalışıyor mu?" sorusunun y
 Endpoint  http://127.0.0.1:8899/v1
 Model     mock-model
 
-PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
@@ -92,16 +101,17 @@ Her kontrolün ne sorduğu: [health-check.md](health-check.md#basit-altı-kontro
 ```
 
 ```
-UYARI model yoklama     1/3 model cevap verdi (detay: Get-LlmModels.ps1 -Probe)
-PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 5ms, prompt_tokens=36)
-PASS  yük               10/10 istek · TTFT p95 67ms · 66 token/s
+UYARI model yoklama     1/4 model cevap verdi (detay: Get-LlmModels.ps1 -Probe)
+PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 6ms, prompt_tokens=36)
+PASS  rerank            8/8 geçti  (4 doküman, ilk çağrı 6ms, prompt_tokens=61)
+PASS  yük               10/10 istek · TTFT p95 69ms · 65 token/s
 
-Sonuç: 8/9 geçti · 1 uyarı · endpoint sağlıklı (2.7s)
+Sonuç: 9/10 geçti · 1 uyarı · endpoint sağlıklı (2.9s)
 ```
 
-**Geçti sayılır:** exit `0` · basit kontrollerin altı satırı + üç gelişmiş satır ·
+**Geçti sayılır:** exit `0` · basit kontrollerin altı satırı + dört gelişmiş satır ·
 `model yoklama` **UYARI** — çünkü sahte sunucu bilerek çalışmayan bir model
-yayınlıyor; gerçek bir endpoint'te `3/3 model cevap verdi` beklenir.
+yayınlıyor; gerçek bir endpoint'te `4/4 model cevap verdi` beklenir.
 **Değişen:** bütün zaman değerleri.
 
 `UYARI` exit kodunu değiştirmez; yalnızca `FAIL` değiştirir. Embeddings satırı
@@ -299,7 +309,7 @@ error-503
 ```
 
 **Geçti sayılır:** exit `0` · satır başına bir id, sunucunun kendi sırasıyla.
-Sahte sunucu bilerek üç model yayınlar, biri çalışmaz — W11'i tekrarlanabilir
+Sahte sunucu bilerek dört model yayınlar, biri çalışmaz — W11'i tekrarlanabilir
 kılan da bu.
 
 ### W09 — Metadata tablosu
@@ -361,7 +371,7 @@ Model      Status Ms Not
 mock-model ok      2
 mock-embed 400     3 bu model chat completions desteklemiyor
 error-503  503     1 'error-503' modeli için enjekte edilmiş hata
-1/3 model cevap verdi
+1/4 model cevap verdi
 1
 ```
 
@@ -505,16 +515,68 @@ betiklerinin çıktısı içindir.
 
 ---
 
+## Rerank
+
+Rerank betiği de Python'dur ve her işletim sisteminde aynı davranır.
+
+### R1 — Sıralama doğru mu? (basit)
+
+```powershell
+python python\rerank-test.py
+```
+
+```
+Sorgu   Kubernetes'te GPU node nasıl etiketlenir?
+Model   mock-rerank · 4 doküman · 8ms
+
+  #  skor    doküman
+  1  0.6338  GPU node etiketlemek için kubectl label komutu kullanılır.
+  2  0.5525  Kubernetes cluster'ında pod'lara kaynak limiti tanımlama.
+  3  0.5517  Prometheus ile disk doluluk alarmı kurma adımları.
+  4  0.4121  Sahilde balık ızgara yapmanın püf noktaları.
+
+Yorum   birinci ile ikinci arasındaki fark 0.0813 — ayrım orta; eşik belirlerken kendi verinizle doğrulayın
+```
+
+**Geçti sayılır:** exit `0` · **doğru cevap 1. sırada** · `Yorum` satırı farkı
+yorumluyor. Farkın nasıl okunacağı: [rerank.md](rerank.md#sonucu-nasıl-okumalı).
+
+Kendi verinizle:
+
+```powershell
+python python\rerank-test.py "disk alarmı nasıl kurulur" `
+  "Prometheus ile disk doluluk alarmı kurma adımları." `
+  "Balık ızgara tarifi." --top-n 2
+```
+
+### R2–R4 — Sağlık paketi, throughput, hata yolu
+
+```powershell
+python python\rerank-test.py --suite                          # 8/8 geçti, exit 0
+python python\rerank-test.py --bench 24 --concurrency 4 --docs 8
+python python\rerank-test.py -m error-503                     # HTTP 503, exit 1
+```
+
+Beklenen çıktılar Linux runbook'undaki
+[R2–R4](runbook-linux.md#rerank) ile birebir aynıdır.
+
+Türkçe karakterler konsolda bozuk görünüyorsa oturum başına bir kez
+`[Console]::OutputEncoding = [Text.Encoding]::UTF8` çalıştırın; Python betikleri
+kendi çıktılarını zaten UTF-8'e sabitler.
+
+---
+
 ## Gerçek bir endpoint'e karşı
 
 ```powershell
 $env:LLM_ENDPOINT    = 'http://10.0.0.10:8000'
 $env:LLM_API_KEY     = $env:MY_KEY
 $env:LLM_MODEL       = 'Qwen/Qwen2.5-7B-Instruct'
-$env:LLM_EMBED_MODEL = 'BAAI/bge-m3'
+$env:LLM_EMBED_MODEL  = 'BAAI/bge-m3'
+$env:LLM_RERANK_MODEL = 'BAAI/bge-reranker-v2-m3'
 ```
 
-Ardından B1–B4 ve W01–W16'yı tekrarlayın. Beklentiler Linux runbook'undaki
+Ardından B1–B4, W01–W16 ve R1–R4'ü tekrarlayın. Beklentiler Linux runbook'undaki
 [gerçek endpoint tablosuyla](runbook-linux.md#gerçek-bir-endpointe-karşı) aynıdır.
 
 Windows'a özgü dikkat edilecekler:

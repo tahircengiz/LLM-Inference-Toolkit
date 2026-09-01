@@ -34,6 +34,19 @@ beklenir. Bu sayfa, insanları takan backend'e özgü ayrıntıları toplar.
 | **Ollama** | `http://host:11434` | `nomic-embed-text` gibi bir embedding modeliyle `/v1/embeddings` |
 | **OpenAI** | `https://api.openai.com` | `text-embedding-3-small/large`, `dimensions` destekler |
 
+## Rerank (`/v1/rerank`)
+
+| Backend | Notlar |
+| --- | --- |
+| **vLLM** | `vllm serve BAAI/bge-reranker-v2-m3`; `/rerank`, `/v1/rerank` ve `/v2/rerank` |
+| **TEI** | Sequence-classification reranker'ları; yerel `/rerank` ve Cohere uyumlu yol |
+| **Infinity** | Embedding ve rerank aynı süreçte |
+| **Jina / Cohere / Voyage** | Bulut; `relevance_score` 0–1 arası |
+| **Ollama** | Rerank endpoint'i yok |
+
+`/v1/rerank` bir OpenAI standardı değil, Cohere'in başlattığı yaygın bir biçim;
+yanıt şekilleri farklılaşabilir. Ayrıntı: [rerank.md](rerank.md).
+
 ## Model listeleri (`/v1/models`)
 
 | Backend | Listede ne olur |

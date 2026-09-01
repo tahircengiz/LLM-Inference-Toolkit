@@ -15,6 +15,7 @@ ENDPOINT="${LLM_ENDPOINT:-}"
 API_KEY="${LLM_API_KEY:-}"
 MODEL="${LLM_MODEL:-}"
 EMBED_MODEL="${LLM_EMBED_MODEL:-}"
+RERANK_MODEL="${LLM_RERANK_MODEL:-}"
 FULL=false
 QUIET=false
 TIMEOUT=60
@@ -33,8 +34,9 @@ Endpoint'in çalışıp çalışmadığını tek komutla söyler.
   -k, --api-key KEY      Bearer token (env: LLM_API_KEY)
   -m, --model AD         Model adı (env: LLM_MODEL)
       --embed-model AD   Embedding modeli (env: LLM_EMBED_MODEL), --full için
-      --full             Gelişmiş kontroller: model yoklama, embeddings sağlık
-                         paketi ve kısa bir yük testi de çalıştırılır
+      --rerank-model AD  Reranker modeli (env: LLM_RERANK_MODEL), --full için
+      --full             Gelişmiş kontroller: model yoklama, embeddings ve rerank
+                         sağlık paketleri ve kısa bir yük testi de çalıştırılır
       --timeout N        İstek zaman aşımı (saniye), varsayılan 60
   -i, --insecure         TLS doğrulamasını atla (self-signed endpoint)
   -q, --quiet            Yalnızca son satırı yazdır
@@ -53,6 +55,7 @@ while [[ $# -gt 0 ]]; do
         -k|--api-key)     API_KEY="$2"; shift 2 ;;
         -m|--model)       MODEL="$2"; shift 2 ;;
         --embed-model)    EMBED_MODEL="$2"; shift 2 ;;
+        --rerank-model)   RERANK_MODEL="$2"; shift 2 ;;
         --full)           FULL=true; shift ;;
         --timeout)        TIMEOUT="$2"; shift 2 ;;
         -i|--insecure)    INSECURE=true; shift ;;
@@ -319,6 +322,28 @@ if $FULL; then
             fi
         else
             satir FAIL "embeddings" "sağlık paketi çalışmadı"
+        fi
+    fi
+
+    rerank_betik="$SCRIPT_DIR/../python/rerank-test.py"
+    if [[ -z "$RERANK_MODEL" ]]; then
+        satir UYARI "rerank" "LLM_RERANK_MODEL tanımlı değil, atlandı"
+    elif ! command -v python3 >/dev/null 2>&1; then
+        satir UYARI "rerank" "python3 yok, atlandı"
+    elif [[ ! -f "$rerank_betik" ]]; then
+        satir UYARI "rerank" "rerank-test.py bulunamadı"
+    else
+        rerank_cikti="$(LLM_ENDPOINT="$base" LLM_API_KEY="$API_KEY" LLM_RERANK_MODEL="$RERANK_MODEL" \
+            python3 "$rerank_betik" --suite 2>&1 | tail -1)"
+        if [[ "$rerank_cikti" == *"geçti"* ]]; then
+            gecen_r="${rerank_cikti%% *}"
+            if [[ "${gecen_r%%/*}" == "${gecen_r##*/}" ]]; then
+                satir PASS "rerank" "$rerank_cikti"
+            else
+                satir FAIL "rerank" "$rerank_cikti (detay: rerank-test.py --suite)"
+            fi
+        else
+            satir FAIL "rerank" "sağlık paketi çalışmadı"
         fi
     fi
 

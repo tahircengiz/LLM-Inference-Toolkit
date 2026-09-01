@@ -50,6 +50,20 @@ PowerShell betiklerine dokunduysanız smoke testi `pwsh` kurulu bir makinede
 CI aynı smoke testi Ubuntu, macOS ve Windows'ta koşar; ayrıca ShellCheck ve
 PSScriptAnalyzer'ı error seviyesinde çalıştırır.
 
+## Doküman yazarken
+
+Okuyucu dokümana baktığında iki şeyi hemen anlamalı: **ne çalıştıracağını** ve
+**sonucu nasıl yorumlayacağını.** Bunun için her bölüm şu sırayla yazılır:
+
+1. Komut (kopyala-yapıştır çalışacak halde)
+2. Beklenen çıktı (gerçekten çalıştırılmış, birebir)
+3. "Geçti sayılır" — neye bakarak tamam denecek
+4. "Değişen" — koşumlar arasında farklılaşacak kısımlar
+5. Sayı üreten bir çıktı varsa: o sayı hangi aralıkta ne anlama geliyor
+
+Yeni bir terim geçiriyorsanız [docs/glossary.md](docs/glossary.md) dosyasına
+ekleyin; sözlük "hangi değeri görünce ne düşünmeli" sorusuna cevap verir.
+
 ## Yeni betik eklerken
 
 Betiği çalışma ortamının klasörüne koyun (`bash/`, `powershell/`, `python/`),

@@ -2,8 +2,8 @@
 <#
 .SYNOPSIS
     Tek komutla endpoint sağlık kontrolü: erişim, kimlik doğrulama, model, chat,
-    UTF-8 ve streaming. -Full ile model yoklama, embeddings sağlık paketi ve kısa
-    bir yük testi de çalıştırılır.
+    UTF-8 ve streaming. -Full ile model yoklama, embeddings ve rerank sağlık
+    paketleri ve kısa bir yük testi de çalıştırılır.
 
 .DESCRIPTION
     bash/llm-check.sh betiğinin PowerShell karşılığı. Yalnızca .NET kullanır -
@@ -22,8 +22,9 @@ param(
     [string]$ApiKey = $env:LLM_API_KEY,
     [string]$Model = $env:LLM_MODEL,
     [string]$EmbedModel = $env:LLM_EMBED_MODEL,
+    [string]$RerankModel = $env:LLM_RERANK_MODEL,
 
-    # Gelişmiş kontroller: model yoklama, embeddings paketi, kısa yük testi
+    # Gelişmiş kontroller: model yoklama, embeddings ve rerank paketleri, kısa yük testi
     [switch]$Full,
 
     # Yalnızca son satırı yazdır (cron / CI için)
@@ -351,6 +352,31 @@ if ($Full) {
             }
         } else {
             Write-Satir 'FAIL' 'embeddings' 'sağlık paketi çalışmadı'
+        }
+    }
+
+    $rerankBetik = Join-Path $ScriptDir '..\python\rerank-test.py'
+    if ([string]::IsNullOrWhiteSpace($RerankModel)) {
+        Write-Satir 'UYARI' 'rerank' 'LLM_RERANK_MODEL tanımlı değil, atlandı'
+    } elseif (-not $py) {
+        Write-Satir 'UYARI' 'rerank' 'python bulunamadı, atlandı'
+    } elseif (-not (Test-Path $rerankBetik)) {
+        Write-Satir 'UYARI' 'rerank' 'rerank-test.py bulunamadı'
+    } else {
+        $env:LLM_RERANK_MODEL = $RerankModel
+        $cikti = & $py $rerankBetik --suite 2>&1 | Out-String
+        $ozet = ($cikti -split "`r?`n" | Where-Object { $_ -match 'geçti' } | Select-Object -Last 1)
+        if ($ozet) {
+            $ozet = $ozet.Trim()
+            $oran = ($ozet -split ' ')[0]
+            $parcalar = $oran -split '/'
+            if ($parcalar.Count -eq 2 -and $parcalar[0] -eq $parcalar[1]) {
+                Write-Satir 'PASS' 'rerank' $ozet
+            } else {
+                Write-Satir 'FAIL' 'rerank' ("{0} (detay: rerank-test.py --suite)" -f $ozet)
+            }
+        } else {
+            Write-Satir 'FAIL' 'rerank' 'sağlık paketi çalışmadı'
         }
     }
 

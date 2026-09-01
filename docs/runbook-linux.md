@@ -6,14 +6,22 @@ koşumdan birebir kopyalanmıştır. Koşumlar arasında meşru olarak değişen
 (gecikme, tok/s) her testin altında ayrıca belirtilir.
 
 Windows kullanıyorsanız: [runbook-windows.md](runbook-windows.md).
+Çıktılardaki terimler için: [sözlük](glossary.md).
+
+**Her test aynı düzendedir:**
+
+> **Komut** → yazacağınız satır
+> **Çıktı** → görmeniz gereken
+> **Geçti sayılır** → neye bakarak "tamam" diyeceğiniz
+> **Değişen** → koşumdan koşuma farklılaşacak kısımlar (genelde süreler)
 
 ## Doğrulanmış ortamlar
 
 | Ortam | Kabuk | Python | curl / jq | Sonuç |
 | --- | --- | --- | --- | --- |
-| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 46/46 |
-| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 46/46 |
-| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 46/46 |
+| macOS 26.5.2 (yerel) | Bash 3.2.57 | 3.9.6 | curl 8.7.1 / jq 1.7.1 | ✅ 51/51 |
+| `ubuntu-latest` (CI) | Bash 5.x | 3.14.7 | curl 8.5.0 / jq 1.7 | ✅ 51/51 |
+| `macos-latest` (CI) | Bash 3.2.57 | 3.14.6 | curl 8.7.1 / jq 1.8.2 | ✅ 51/51 |
 
 Bash 3.2 bilinçli bir hedef: macOS'un getirdiği sürüm o, orada çalışan her şey
 modern Linux'ta da çalışır.
@@ -32,13 +40,14 @@ python3 examples/mock_server.py --port 8899
 export LLM_ENDPOINT=http://127.0.0.1:8899
 export LLM_API_KEY=sk-mock
 export LLM_MODEL=mock-model
-export LLM_EMBED_MODEL=mock-model
+export LLM_EMBED_MODEL=mock-embed
+export LLM_RERANK_MODEL=mock-rerank
 ```
 
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```bash
-python3 tests/smoke_test.py          # beklenen: 46 geçti, 0 başarısız
+python3 tests/smoke_test.py          # beklenen: 51 geçti, 0 başarısız
 ```
 
 ---
@@ -57,7 +66,7 @@ bash/llm-check.sh
 Endpoint  http://127.0.0.1:8899/v1
 Model     mock-model
 
-PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
@@ -80,16 +89,17 @@ bash/llm-check.sh --full
 ```
 
 ```
-UYARI model yoklama     1/3 model cevap verdi (detay: llm-models.sh --probe)
-PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 5ms, prompt_tokens=36)
-PASS  yük               10/10 istek · TTFT p95 86ms · 65 token/s
+UYARI model yoklama     1/4 model cevap verdi (detay: llm-models.sh --probe)
+PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 6ms, prompt_tokens=36)
+PASS  rerank            8/8 geçti  (4 doküman, ilk çağrı 5ms, prompt_tokens=61)
+PASS  yük               10/10 istek · TTFT p95 67ms · 65 token/s
 
-Sonuç: 8/9 geçti · 1 uyarı · endpoint sağlıklı (2.5s)
+Sonuç: 9/10 geçti · 1 uyarı · endpoint sağlıklı (2.6s)
 ```
 
-**Geçti sayılır:** exit `0` · basit kontrollerin altı satırı + üç gelişmiş satır ·
+**Geçti sayılır:** exit `0` · basit kontrollerin altı satırı + dört gelişmiş satır ·
 `model yoklama` **UYARI** — çünkü sahte sunucu bilerek çalışmayan bir model
-yayınlıyor; gerçek bir endpoint'te `3/3 model cevap verdi` beklenir.
+yayınlıyor; gerçek bir endpoint'te `4/4 model cevap verdi` beklenir.
 **Değişen:** bütün zaman değerleri.
 
 `UYARI` exit kodunu değiştirmez; yalnızca `FAIL` değiştirir.
@@ -272,7 +282,7 @@ error-503
 ```
 
 **Geçti sayılır:** exit `0` · satır başına bir id, sunucunun kendi sırasıyla ·
-pipe'lanabilir (`bash/llm-models.sh | wc -l`). Sahte sunucu bilerek üç model
+pipe'lanabilir (`bash/llm-models.sh | wc -l`). Sahte sunucu bilerek dört model
 yayınlar, biri çalışmaz — L12'yi tekrarlanabilir kılan da bu.
 
 ### L10 — Metadata tablosu
@@ -322,7 +332,7 @@ mock-model  ok           16ms
 mock-embed  400          17ms  bu model chat completions desteklemiyor
 error-503   503          17ms  'error-503' modeli için enjekte edilmiş hata
 
-1/3 model cevap verdi
+1/4 model cevap verdi
 exit=1
 ```
 
@@ -584,6 +594,109 @@ exit=1
 
 ---
 
+## Rerank
+
+### R1 — Sıralama doğru mu? (basit)
+
+```bash
+python3 python/rerank-test.py
+```
+
+```
+Sorgu   Kubernetes'te GPU node nasıl etiketlenir?
+Model   mock-rerank · 4 doküman · 8ms
+
+  #  skor    doküman
+  1  0.6338  GPU node etiketlemek için kubectl label komutu kullanılır.
+  2  0.5525  Kubernetes cluster'ında pod'lara kaynak limiti tanımlama.
+  3  0.5517  Prometheus ile disk doluluk alarmı kurma adımları.
+  4  0.4121  Sahilde balık ızgara yapmanın püf noktaları.
+
+Yorum   birinci ile ikinci arasındaki fark 0.0813 — ayrım orta; eşik belirlerken kendi verinizle doğrulayın
+```
+
+**Geçti sayılır:** exit `0` · **doğru cevap (`kubectl label` içeren cümle) 1.
+sırada** · `Yorum` satırı farkı yorumluyor.
+**Değişen:** gecikme. Skorlar sahte sunucuda sabittir; gerçek modelde farklıdır.
+
+Parametresiz çalıştırıldığında yerleşik bir örnek kullanılır: bir soru, bir doğru
+cevap, iki alakasız ve bir kısmen ilgili doküman. Kendi verinizle:
+
+```bash
+python3 python/rerank-test.py "disk alarmı nasıl kurulur" \
+  "Prometheus ile disk doluluk alarmı kurma adımları." \
+  "Balık ızgara tarifi." --top-n 2
+```
+
+```
+  #  skor    doküman
+  1  0.7300  Prometheus ile disk doluluk alarmı kurma adımları.
+  2  0.4900  Balık ızgara tarifi.
+
+Yorum   birinci ile ikinci arasındaki fark 0.2400 — ayrım net
+```
+
+Farkın nasıl yorumlanacağı: [rerank.md](rerank.md#sonucu-nasıl-okumalı).
+
+### R2 — Sağlık paketi (gelişmiş)
+
+```bash
+python3 python/rerank-test.py --suite; echo "exit=$?"
+```
+
+```
+PASS  her doküman puanlandı                    4 doküman gönderildi, 4 sonuç döndü
+PASS  index'ler geçerli ve benzersiz           index'ler=[1, 3, 2, 0]
+PASS  sonuçlar skora göre azalan sıralı        skorlar=0.6338, 0.5525, 0.5517, 0.4121
+PASS  ilgili doküman ilk sırada                ilk=index 1 · fark=0.0813
+PASS  çağrılar arası deterministik             sıra aynı=evet max|delta|=0.000e+00
+PASS  doküman sırası sonucu değiştirmiyor      ters sırada da aynı doküman ilk=evet · skor farkı=0.000e+00
+PASS  top_n uygulanıyor                        top_n=2 için 2 sonuç döndü
+PASS  uzun doküman (~132000 karakter) işlendi  sessizce truncate edildi
+
+8/8 geçti  (4 doküman, ilk çağrı 6ms, prompt_tokens=61)
+exit=0
+```
+
+**Geçti sayılır:** `8/8 geçti` ve exit `0`. Her kontrolün neyi koruduğu:
+[rerank.md](rerank.md#gelişmiş---suite). En kritik ikisi **index'ler geçerli**
+(yanlış dokümanı bağlama koymanızı engeller) ve **doküman sırası sonucu
+değiştirmiyor** (aday listesinin sırası cevabı değiştirmemeli).
+
+### R3 — Throughput
+
+```bash
+python3 python/rerank-test.py --bench 24 --concurrency 4 --docs 8
+```
+
+```
+istek=24  doküman/istek=8  eşzamanlılık=4  toplam doküman=192
+süre=0.02s  throughput=1106.5 istek/s  8852 doküman/s
+gecikme ms: ort=3 p50=3 p95=7 p99=8 maks=8
+```
+
+**Geçti sayılır:** exit `0` · `toplam doküman = istek × doküman/istek`.
+**Değişen:** bütün sayılar.
+
+Rerank'te asıl bakılacak sayı **doküman/s**'dir; maliyet doküman sayısıyla
+büyür. `--docs` değerini gerçek aday sayınıza eşitleyin.
+
+### R4 — Hata yolu
+
+```bash
+python3 python/rerank-test.py -m error-503; echo "exit=$?"
+```
+
+```
+HTTP 503 from http://127.0.0.1:8899/v1/rerank
+{"error": {"message": "'error-503' modeli için enjekte edilmiş hata", "type": "injected_error", "code": null}}
+exit=1
+```
+
+**Geçti sayılır:** exit `1` ve sunucunun gövdesi stderr'de.
+
+---
+
 ## Gerçek bir endpoint'e karşı
 
 Üç değişkeni değiştirip aynı testleri tekrarlayın:
@@ -593,6 +706,7 @@ export LLM_ENDPOINT=http://10.0.0.10:8000
 export LLM_API_KEY="$MY_KEY"
 export LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 export LLM_EMBED_MODEL=BAAI/bge-m3
+export LLM_RERANK_MODEL=BAAI/bge-reranker-v2-m3
 ```
 
 Sahte sunucunun sabit değerleri yerine beklenecekler:
@@ -614,6 +728,9 @@ Sahte sunucunun sabit değerleri yerine beklenecekler:
 | E02 | Paraphrase ≫ alakasız. Dar bir fark, modelin diliniz ya da alanınız için zayıf olduğunu gösterir |
 | E03 | `7/7 geçti`. Her FAIL [sorun giderme](troubleshooting.md#sonuçlar-yanlış-görünüyor) sayfasında açıklanıyor — *batch pozisyonu* ve *L2-normalize* düşerse blocker sayın |
 | E04 | `--batch-size` değerini throughput artmayı bırakana kadar yükseltin; kuyruk için p95/p99'a bakın |
+| R1 | Doğru doküman 1. sırada ve fark ≥ 0.20 olmalı. Dar farkta eşik yerine sabit `top_n` kullanın |
+| R2 | `8/8 geçti`. *index'ler geçerli* ve *doküman sırası sonucu değiştirmiyor* düşerse blocker sayın |
+| R3 | `--docs` değerini gerçek aday sayınıza eşitleyin; doküman/s kapasitenizi belirler |
 
 Sonuçlarınızı aynı tablo biçiminde kaydedip PR açın — gerçek backend'lerden
 gelen doğrulanmış rakamlar tam olarak

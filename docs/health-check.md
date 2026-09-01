@@ -28,7 +28,7 @@ llm-check.sh
 Endpoint  http://127.0.0.1:8899/v1
 Model     mock-model
 
-PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
@@ -76,28 +76,30 @@ llm-check.sh --full
 ```
 
 ```
-PASS  erişim            HTTP 200 · 3 model listeleniyor
+PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
 PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe k"
 PASS  streaming         11 chunk · 332ms
 
-UYARI model yoklama     1/3 model cevap verdi (detay: llm-models.sh --probe)
-PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 5ms, prompt_tokens=36)
-PASS  yük               10/10 istek · TTFT p95 86ms · 65 token/s
+UYARI model yoklama     1/4 model cevap verdi (detay: llm-models.sh --probe)
+PASS  embeddings        7/7 geçti  (dim=128, ilk çağrı 6ms, prompt_tokens=36)
+PASS  rerank            8/8 geçti  (4 doküman, ilk çağrı 5ms, prompt_tokens=61)
+PASS  yük               10/10 istek · TTFT p95 67ms · 65 token/s
 
-Sonuç: 8/9 geçti · 1 uyarı · endpoint sağlıklı (2.5s)
+Sonuç: 9/10 geçti · 1 uyarı · endpoint sağlıklı (2.6s)
 ```
 
 | Ek kontrol | Ne yapar | Kullandığı betik |
 | --- | --- | --- |
 | **model yoklama** | Listedeki her modele 1 token'lık istek atar; hepsi cevap vermiyorsa UYARI (embedding modelleri chat'i haklı olarak reddeder) | [`llm-models.sh --probe`](models.md) |
 | **embeddings** | 7 kontrollük embedding sağlık paketi. `LLM_EMBED_MODEL` tanımlı değilse atlanır | [`embed-test.py --suite`](embeddings.md) |
+| **rerank** | 8 kontrollük reranker sağlık paketi. `LLM_RERANK_MODEL` tanımlı değilse atlanır | [`rerank-test.py --suite`](rerank.md) |
 | **yük** | 10 istek / 2 eşzamanlılık ile kısa bir yük testi; TTFT p95 ve çıktı token/s | [`chat-loadtest.py`](loadtest.md) |
 
 Yukarıdaki çıktıdaki `UYARI` sahte sunucudan gelir: mock, bilerek çalışmayan bir
-model yayınlar. Gerçek bir endpoint'te `3/3 model cevap verdi` beklenir.
+model yayınlar. Gerçek bir endpoint'te `4/4 model cevap verdi` beklenir.
 
 Bulunamayan betikler ve kurulu olmayan çalışma ortamları (`python3` yoksa) hata
 değil UYARI üretir — `--full`, betiğin tek başına taşınmasını engellemez.
@@ -113,6 +115,7 @@ değil UYARI üretir — `--full`, betiğin tek başına taşınmasını engelle
 | --- | --- |
 | model yoklama | `llm-models.sh --probe` → [model keşfi](models.md) |
 | embeddings | `embed-test.py --suite` → [embeddings](embeddings.md) |
+| rerank | `rerank-test.py --suite` → [rerank](rerank.md) |
 | yük | `chat-loadtest.py -n 100 -c 16` → [yük testi ve TTFT](loadtest.md) |
 | chat / UTF-8 / streaming | `llm-prompt.sh -v --stream` → [chat completions](chat-completions.md) |
 
@@ -131,6 +134,7 @@ ekledikçe detay verir.**
 | `llm-prompt.sh` | `llm-prompt.sh "Merhaba"` — yanıt | `-v` token/gecikme · `--stream` · `--raw` ham JSON |
 | `llm-models.sh` | `llm-models.sh` — id listesi | `-l` metadata · `--probe` yoklama · `--has` CI kapısı |
 | `embed-test.py` | `embed-test.py "metin"` — dim ve norm | `--suite` 7 kontrol · `--pair` cosine · `--bench` throughput |
+| `rerank-test.py` | `rerank-test.py` — yerleşik örnekle sıralama | `--suite` 8 kontrol · `--bench` throughput |
 | `chat-loadtest.py` | `chat-loadtest.py -n 10` — TTFT özeti | `--duration` · `--csv` / `--json` · `--max-ttft-p95` SLO |
 
 Doğrulanmış komut–çıktı çiftleri runbook'larda:

@@ -6,9 +6,10 @@ GPU, model ya da ağ erişimi olmadan bu depodaki her betiği denemenizi (ve smo
 testlerini çalıştırmanızı) sağlar. Betiklerin dokunduğu API yüzeyinin yalnızca
 gerekli kadarını uygular:
 
-    GET  /v1/models                (üç model, biri bilerek bozuk)
+    GET  /v1/models                (dört model, biri bilerek bozuk)
     POST /v1/chat/completions      (bloklayan ve stream=true / SSE)
     POST /v1/embeddings            (float ve base64 encoding_format)
+    POST /v1/rerank                (Cohere/Jina biçimi: results[].relevance_score)
 
 Model adı "error-404" gibi olan her istek o HTTP status'u ile yanıtlanır; böylece
 betiklerin hata yolları tekrarlanabilir şekilde test edilebilir.
@@ -39,6 +40,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 MODEL_ID = "mock-model"
 EMBED_MODEL_ID = "mock-embed"
+RERANK_MODEL_ID = "mock-rerank"
 BROKEN_MODEL_ID = "error-503"
 
 # Sabit timestamp: /v1/models çıktısı her makinede byte-byte aynı olsun.
@@ -47,6 +49,8 @@ CATALOG = [
     {"id": MODEL_ID, "object": "model", "created": 1735689600, "owned_by": "mock",
      "max_model_len": 8192},
     {"id": EMBED_MODEL_ID, "object": "model", "created": 1740787200, "owned_by": "mock",
+     "max_model_len": 512},
+    {"id": RERANK_MODEL_ID, "object": "model", "created": 1740787200, "owned_by": "mock",
      "max_model_len": 512},
     # Listede var ama çalışmıyor - probe çıktısında tekrarlanabilir bir hata satırı.
     {"id": BROKEN_MODEL_ID, "object": "model", "owned_by": "mock"},
@@ -89,6 +93,10 @@ def embed_text(text, dim=DEFAULT_DIM, max_chars=8192):
         vec[0] = 1.0
         return vec
     return [x / norm for x in vec]
+
+
+def cosine(a, b):
+    return sum(x * y for x, y in zip(a, b))
 
 
 def to_base64(vec):
@@ -168,9 +176,11 @@ class Handler(BaseHTTPRequestHandler):
             self._chat()
         elif self.path.endswith("/embeddings"):
             self._embeddings()
+        elif self.path.endswith("/rerank"):
+            self._rerank()
         else:
-            self._error(404, "bilinmeyen rota %s (/v1/chat/completions ya da "
-                             "/v1/embeddings bekleniyordu)" % self.path, "not_found")
+            self._error(404, "bilinmeyen rota %s (/v1/chat/completions, /v1/embeddings "
+                             "ya da /v1/rerank bekleniyordu)" % self.path, "not_found")
 
     def _chat(self):
         if not self._authorized():
@@ -183,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self._maybe_injected_error(body["model"]):
             return
-        if body["model"] == EMBED_MODEL_ID:
+        if body["model"] in (EMBED_MODEL_ID, RERANK_MODEL_ID):
             self._error(400, "bu model chat completions desteklemiyor",
                         "invalid_request_error")
             return
@@ -262,6 +272,54 @@ class Handler(BaseHTTPRequestHandler):
                          "embedding": to_base64(vec) if fmt == "base64" else vec})
         tokens = sum(rough_tokens(str(t)) for t in texts)
         self._json({"object": "list", "model": body["model"], "data": data,
+                    "usage": {"prompt_tokens": tokens, "total_tokens": tokens}})
+
+
+    def _rerank(self):
+        if not self._authorized():
+            return
+        body = self._read_body()
+        if body is None:
+            return
+        if not body.get("model"):
+            self._error(400, "'model' zorunlu bir alan")
+            return
+        if self._maybe_injected_error(body["model"]):
+            return
+        query = body.get("query")
+        if not query:
+            self._error(400, "'query' zorunlu bir alan")
+            return
+        docs = body.get("documents")
+        if isinstance(docs, str):
+            docs = [docs]
+        if not docs:
+            self._error(400, "'documents' boş olmayan bir dizi olmalı")
+            return
+
+        time.sleep(self.server.delay)
+        qv = embed_text(str(query))
+        puanlar = []
+        for i, d in enumerate(docs):
+            metin = d if isinstance(d, str) else str((d or {}).get("text", ""))
+            # cosine [-1,1] -> relevance_score [0,1]
+            puanlar.append((i, (cosine(qv, embed_text(metin)) + 1.0) / 2.0, metin))
+        # Yüksek puan önce; eşitlikte istek sırası korunur (kararlı sıralama).
+        puanlar.sort(key=lambda t: -t[1])
+
+        top_n = body.get("top_n")
+        if isinstance(top_n, int) and top_n > 0:
+            puanlar = puanlar[:top_n]
+
+        sonuclar = []
+        for i, puan, metin in puanlar:
+            kayit = {"index": i, "relevance_score": puan}
+            if body.get("return_documents"):
+                kayit["document"] = {"text": metin}
+            sonuclar.append(kayit)
+
+        tokens = rough_tokens(str(query)) + sum(rough_tokens(str(d)) for d in docs)
+        self._json({"id": "rerank-mock", "model": body["model"], "results": sonuclar,
                     "usage": {"prompt_tokens": tokens, "total_tokens": tokens}})
 
 
