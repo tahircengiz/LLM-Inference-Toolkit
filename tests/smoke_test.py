@@ -32,6 +32,13 @@ ASCII_MARKER = "mock yanittir"
 results = []
 VERBOSE = False
 
+# The Windows console defaults to cp1252, which cannot print the Turkish text
+# the scripts return. That is a limitation of this harness's own stdout, not of
+# the scripts under test, so force UTF-8 here.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 
 def free_port():
     with socket.socket() as s:
@@ -130,6 +137,8 @@ def main():
             expect=[ASCII_MARKER], stdin="Merhaba\n")
         run("bash: rejects missing model",
             [bash, bash_script, "-m", "", "Merhaba"], env, want_code=1)
+        run("bash: surfaces an HTTP error",
+            [bash, bash_script, "-m", "error-404", "Merhaba"], env, want_code=1)
         # endpoint normalization: base, /v1 and the full path must all work
         for suffix in ("/v1", "/v1/chat/completions"):
             e2 = dict(env, LLM_ENDPOINT=base + suffix)
@@ -158,6 +167,9 @@ def main():
         run("powershell: rejects missing model",
             [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba"],
             e2, want_code=1)
+        run("powershell: surfaces an HTTP error",
+            [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba",
+             "-Model", "error-404"], env, want_code=1)
 
     # ---- python embeddings ----------------------------------------------
     run("python: embed single text", [py, embed_script, "merhaba dünya"],
@@ -169,6 +181,8 @@ def main():
     run("python: throughput bench",
         [py, embed_script, "--bench", "16", "--concurrency", "4", "--batch-size", "4"],
         env, expect=["throughput=", "p95="])
+    run("python: surfaces an HTTP error", [py, embed_script, "-m", "error-500", "x"],
+        env, want_code=1)
     e_bad = dict(env, LLM_ENDPOINT="http://127.0.0.1:%d" % free_port())
     run("python: reports a dead endpoint", [py, embed_script, "merhaba"],
         e_bad, want_code=1)

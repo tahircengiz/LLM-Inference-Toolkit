@@ -10,7 +10,10 @@ scripts touch:
     POST /v1/chat/completions      (blocking and stream=true / SSE)
     POST /v1/embeddings            (float and base64 encoding_format)
 
-Embeddings are deterministic character-trigram hashes, L2-normalized, so the
+Any request whose model name looks like "error-404" is answered with that HTTP
+status, so the failure paths of the scripts can be tested reproducibly.
+
+Embeddings are deterministic word + character-trigram hashes, L2-normalized, so the
 sanity suite in python/embed-test.py behaves like it would against a real
 model: identical texts match exactly, paraphrases score higher than unrelated
 text, and batch position never changes a vector.
@@ -120,6 +123,18 @@ class Handler(BaseHTTPRequestHandler):
         self._error(401, "missing or malformed Authorization header", "authentication_error")
         return False
 
+    def _maybe_injected_error(self, model):
+        """model="error-404" makes the server answer 404 - lets the scripts'
+        failure paths be tested with a reproducible, documented status."""
+        if not str(model).startswith("error-"):
+            return False
+        try:
+            status = int(str(model).split("-", 1)[1])
+        except ValueError:
+            status = 500
+        self._error(status, "injected error for model %r" % model, "injected_error")
+        return True
+
     # -- routes -----------------------------------------------------------
     def do_GET(self):
         if self.path.rstrip("/").endswith("/v1/models"):
@@ -147,6 +162,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not body.get("model"):
             self._error(400, "'model' is a required property")
+            return
+        if self._maybe_injected_error(body["model"]):
             return
         messages = body.get("messages") or []
         if not messages:
@@ -198,6 +215,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if not body.get("model"):
             self._error(400, "'model' is a required property")
+            return
+        if self._maybe_injected_error(body["model"]):
             return
         texts = body.get("input")
         if isinstance(texts, str):
