@@ -19,9 +19,9 @@ Linux / macOS / WSL kullanıyorsanız: [runbook-linux.md](runbook-linux.md).
 
 | Ortam | PowerShell | Python | Sonuç |
 | --- | --- | --- | --- |
-| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 34/34 (Bash testleri tasarım gereği atlanır) |
+| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 38/38 (Bash testleri tasarım gereği atlanır) |
 | macOS üzerinde PowerShell 7.6.3 (yerel) | 7.6.3 | 3.9.6 | ✅ |
-| `windows-latest` (CI, **Windows PowerShell 5.1**) | 5.1 | 3.14.7 | ✅ 34/34 (Bash testleri tasarım gereği atlanır) |
+| `windows-latest` (CI, **Windows PowerShell 5.1**) | 5.1 | 3.14.7 | ✅ 38/38 (Bash testleri tasarım gereği atlanır) |
 
 CI, Windows'ta genellikle yanlış giden şeyi doğruluyor: yanıt temiz UTF-8 olarak
 geliyor, yani `çğışöüÇĞİŞÖÜ` gidiş-dönüşten sağ çıkıyor.
@@ -61,10 +61,43 @@ powershell -ExecutionPolicy Bypass -File .\powershell\Invoke-LlmPrompt.ps1 "Merh
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```powershell
-python tests\smoke_test.py     # beklenen: 34 geçti, 0 başarısız, 1 atlandı
+python tests\smoke_test.py     # beklenen: 38 geçti, 0 başarısız, 1 atlandı
 ```
 
 Atlanan, Bash betiğidir — Windows'ta PowerShell olanı kullanılır.
+
+---
+
+## Parametreler
+
+Üç PowerShell betiği de her şeyi parametreyle alır; ortam değişkenleri yalnızca
+varsayılandır. **Kısa biçimler Bash betikleriyle aynıdır** ve PowerShell
+parametre adları büyük/küçük harf duyarsız olduğu için `-endpoint` de `-Endpoint`
+kadar geçerlidir.
+
+| Betik | Parametreler |
+| --- | --- |
+| `Invoke-LlmPrompt.ps1` | `[-Prompt]` · `-Endpoint`/`-e` · `-ApiKey`/`-k` · `-Model`/`-m` · `-SystemPrompt`/`-s` · `-Temperature`/`-t` · `-MaxTokens`/`-n` · `-TimeoutSec`/`-timeout` · `-Stream` · `-Raw` · `-Insecure`/`-i` · `-Verbose` |
+| `Get-LlmModels.ps1` | `[-Pattern]` · `-Endpoint`/`-e` · `-ApiKey`/`-k` · `-Long`/`-l` · `-Json` · `-Has` · `-Probe` · `-TimeoutSec`/`-timeout` · `-Insecure`/`-i` |
+| `Test-LlmEndpoint.ps1` | `-Endpoint`/`-e` · `-ApiKey`/`-k` · `-Model`/`-m` · `-EmbedModel` · `-RerankModel` · `-EmbedEndpoint` · `-RerankEndpoint` · `-Full` · `-Quiet`/`-q` · `-TimeoutSec`/`-timeout` · `-Insecure`/`-i` |
+
+Hiçbir ortam değişkeni ayarlamadan, doğrudan:
+
+```powershell
+.\powershell\Test-LlmEndpoint.ps1 -e http://10.0.0.10:8000 -k sk-xxx -m qwen3-30b -Full
+.\powershell\Invoke-LlmPrompt.ps1 "Merhaba" -e http://10.0.0.10:8000 -k sk-xxx -m qwen3-30b -n 64
+.\powershell\Get-LlmModels.ps1 qwen -e http://10.0.0.10:8000 -k sk-xxx -l
+```
+
+Parametre listesini her zaman PowerShell'in kendisinden de alabilirsiniz:
+
+```powershell
+Get-Help .\powershell\Test-LlmEndpoint.ps1 -Detailed
+(Get-Command .\powershell\Test-LlmEndpoint.ps1).Parameters.Keys
+```
+
+Sayısal değerler doğrulanır (`-Temperature` 0–2, `-MaxTokens` ≥ 1,
+`-TimeoutSec` ≥ 1); aralık dışı bir değer istek gönderilmeden reddedilir.
 
 ---
 

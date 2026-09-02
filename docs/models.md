@@ -43,6 +43,9 @@ Kullanim: llm-models.sh [secenekler] [desen]
                     [-TimeoutSec <int>] [-Insecure] [-Verbose]
 ```
 
+Kısa biçimler Bash betiğiyle aynı: `-e`, `-k`, `-l`, `-i`. Desen ilk sıradadır,
+yani `Get-LlmModels.ps1 qwen -e http://... -k sk-xxx` çalışır.
+
 PowerShell sürümü metin değil **nesne** döndürür; keşif böylece kabuğun geri
 kalanıyla zincirlenir:
 

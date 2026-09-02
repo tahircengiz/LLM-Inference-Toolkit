@@ -245,8 +245,31 @@ def main():
         run("powershell: --probe bozuk modeli yakalıyor", psrun + ["-Probe"], env,
             expect=["ok", "503"], want_code=1)
 
+        # Kısa parametreler Bash betikleriyle aynı olmalı (-e/-k/-m). Ortam
+        # değişkenlerini bilerek boşaltıyoruz ki bağlanma gerçekten parametreden
+        # gelsin.
+        temiz = dict(env)
+        for degisken in ("LLM_ENDPOINT", "LLM_API_KEY", "LLM_MODEL",
+                         "LLM_EMBED_MODEL", "LLM_RERANK_MODEL"):
+            temiz.pop(degisken, None)
+        run("powershell: kısa parametreler (-e -k -m)",
+            [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba",
+             "-e", base, "-k", "sk-mock", "-m", mock_server.MODEL_ID],
+            temiz, expect=[ASCII_MARKER])
+        run("powershell: models kısa parametreler (-e -k -l)",
+            [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_models,
+             "-e", base, "-k", "sk-mock", "-l"],
+            temiz, expect=["Context", "8192"])
+        run("powershell: küçük harf parametre yazımı",
+            [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba",
+             "-endpoint", base, "-apikey", "sk-mock", "-model", mock_server.MODEL_ID],
+            temiz, expect=[ASCII_MARKER])
+
         ps_check = os.path.join(ROOT, "powershell", "Test-LlmEndpoint.ps1")
         pscheck = [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_check]
+        run("powershell: sağlık kontrolü kısa parametrelerle",
+            pscheck + ["-e", base, "-k", "sk-mock", "-m", mock_server.MODEL_ID, "-q"],
+            temiz, expect=["endpoint sağlıklı"])
         run("powershell: sağlık kontrolü (basit)", pscheck, env,
             expect=["endpoint sağlıklı", "erişim", "chat", "UTF-8", "streaming"])
         run("powershell: sağlık kontrolü -Full", pscheck + ["-Full"],

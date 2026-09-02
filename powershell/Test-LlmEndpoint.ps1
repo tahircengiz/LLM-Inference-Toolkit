@@ -18,9 +18,16 @@
 #>
 [CmdletBinding()]
 param(
+    # Kısa biçimler Bash betiğiyle aynı: -e, -k, -m, -q, -i
+    [Alias('e')]
     [string]$Endpoint = $env:LLM_ENDPOINT,
+
+    [Alias('k')]
     [string]$ApiKey = $env:LLM_API_KEY,
+
+    [Alias('m')]
     [string]$Model = $env:LLM_MODEL,
+
     [string]$EmbedModel = $env:LLM_EMBED_MODEL,
     [string]$RerankModel = $env:LLM_RERANK_MODEL,
 
@@ -32,11 +39,15 @@ param(
     [switch]$Full,
 
     # Yalnızca son satırı yazdır (cron / CI için)
+    [Alias('q')]
     [switch]$Quiet,
 
+    [Alias('timeout')]
+    [ValidateRange(1, 86400)]
     [int]$TimeoutSec = 60,
 
     # TLS sertifika doğrulamasını atla (self-signed iç endpoint'ler)
+    [Alias('i')]
     [switch]$Insecure
 )
 

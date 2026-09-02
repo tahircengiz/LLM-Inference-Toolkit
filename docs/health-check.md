@@ -16,6 +16,20 @@ uzmanlaşmış betiklerdir.
 | Betik | [`bash/llm-check.sh`](../bash/llm-check.sh) | [`powershell/Test-LlmEndpoint.ps1`](../powershell/Test-LlmEndpoint.ps1) |
 | Gerekenler | `curl` + (`jq` ya da `python3`) | PowerShell 5.1 dışında hiçbir şey |
 
+Her iki betik de ortam değişkenlerini okur ama **her şey parametreyle de
+verilebilir**; kısa biçimler ikisinde de aynıdır:
+
+```bash
+bash/llm-check.sh          -e http://10.0.0.10:8000 -k sk-xxx -m qwen --full
+```
+```powershell
+.\Test-LlmEndpoint.ps1    -e http://10.0.0.10:8000 -k sk-xxx -m qwen -Full
+```
+
+Ek olarak: `--embed-model` / `-EmbedModel`, `--rerank-model` / `-RerankModel`,
+ve embedding ya da rerank başka bir adreste servis ediliyorsa
+`--embed-endpoint` / `-EmbedEndpoint`, `--rerank-endpoint` / `-RerankEndpoint`.
+
 ---
 
 ## Basit: altı kontrol, tek komut

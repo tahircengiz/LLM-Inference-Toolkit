@@ -37,11 +37,15 @@ param(
     [string]$Pattern,
 
     # Temel URL (http://host:8000), .../v1 ya da tam .../v1/models
+    # Kısa biçimler Bash betiğiyle aynı: -e, -k, -l, -i
+    [Alias('e')]
     [string]$Endpoint = $env:LLM_ENDPOINT,
 
+    [Alias('k')]
     [string]$ApiKey = $env:LLM_API_KEY,
 
     # Sadece id yerine id, sahip, oluşturulma ve context uzunluğunu yaz
+    [Alias('l')]
     [switch]$Long,
 
     # Ham JSON yanıtını yazdır
@@ -51,9 +55,12 @@ param(
 
     [switch]$Probe,
 
+    [Alias('timeout')]
+    [ValidateRange(1, 86400)]
     [int]$TimeoutSec = 60,
 
     # TLS sertifika doğrulamasını atla (self-signed iç endpoint'ler)
+    [Alias('i')]
     [switch]$Insecure
 )
 

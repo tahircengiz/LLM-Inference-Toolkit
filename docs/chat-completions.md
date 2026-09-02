@@ -69,6 +69,18 @@ ya da WSL'de de çalışır:
                        [-Stream] [-Raw] [-Insecure] [-Verbose]
 ```
 
+**Kısa biçimler Bash betiğiyle aynıdır** — `-e`, `-k`, `-m`, `-s`, `-t`, `-n`,
+`-i` doğrudan çalışır ve PowerShell parametre adları büyük/küçük harf duyarsızdır:
+
+```powershell
+.\Invoke-LlmPrompt.ps1 "Merhaba" -e http://10.0.0.10:8000 -k sk-xxx -m qwen -n 64
+.\Invoke-LlmPrompt.ps1 "Merhaba" -endpoint http://10.0.0.10:8000 -apikey sk-xxx -model qwen
+```
+
+Sayısal parametreler doğrulanır: `-Temperature` 0–2, `-MaxTokens` ≥ 1,
+`-TimeoutSec` ≥ 1. Aralık dışı bir değer, istek gönderilmeden önce net bir
+hatayla reddedilir.
+
 Windows PowerShell 5.1, OpenAI uyumlu çağrıları iki noktada bozar; betik ikisini
 de ele alır:
 

@@ -39,18 +39,29 @@ param(
     [string]$Prompt,
 
     # Temel URL (http://host:8000), .../v1 ya da tam .../v1/chat/completions
+    # Kısa biçimler Bash betiğiyle aynı: -e, -k, -m, -s, -t, -n, -i
+    [Alias('e')]
     [string]$Endpoint = $env:LLM_ENDPOINT,
 
+    [Alias('k')]
     [string]$ApiKey = $env:LLM_API_KEY,
 
+    [Alias('m')]
     [string]$Model = $env:LLM_MODEL,
 
+    [Alias('s')]
     [string]$SystemPrompt,
 
+    [Alias('t')]
+    [ValidateRange(0.0, 2.0)]
     [double]$Temperature = 0.0,
 
+    [Alias('n')]
+    [ValidateRange(1, 1000000)]
     [int]$MaxTokens = 512,
 
+    [Alias('timeout')]
+    [ValidateRange(1, 86400)]
     [int]$TimeoutSec = 300,
 
     # Yanıtın tamamını beklemek yerine token'ları geldikçe yazdır
@@ -60,6 +71,7 @@ param(
     [switch]$Raw,
 
     # TLS sertifika doğrulamasını atla (self-signed iç endpoint'ler)
+    [Alias('i')]
     [switch]$Insecure
 )
 

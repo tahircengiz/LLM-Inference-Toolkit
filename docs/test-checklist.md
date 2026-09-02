@@ -53,8 +53,8 @@ vermez**.
 
 | ☐ | # | Ne | Komut / yer | Beklenen |
 | --- | --- | --- | --- | --- |
-| ☐ | 0.1 | CI beş işte de yeşil | GitHub Actions son koşum | ubuntu 53/53 · macOS 53/53 · windows 34/34 · PS 5.1 34/34 · lint |
-| ☐ | 0.2 | Temiz clone'da smoke | `git clone` → `python3 tests/smoke_test.py` | 53 geçti, 0 başarısız |
+| ☐ | 0.1 | CI beş işte de yeşil | GitHub Actions son koşum | ubuntu 57/57 · macOS 57/57 · windows 38/38 · PS 5.1 38/38 · lint |
+| ☐ | 0.2 | Temiz clone'da smoke | `git clone` → `python3 tests/smoke_test.py` | 57 geçti, 0 başarısız |
 | ☐ | 0.3 | `jq` olmadan | `PATH` içinden jq'yu çıkarıp smoke | aynı sonuç (python3 yedeği) |
 | ☐ | 0.4 | `chmod` sonrası doğrudan çalıştırma | `./bash/llm-check.sh -h` | yardım metni |
 
@@ -133,6 +133,8 @@ vermez**.
 | ☐ | E.5 | Konsol kodlaması | Türkçe karakterler bozuk mu; `[Console]::OutputEncoding` çözüyor mu |
 | ☐ | E.6 | Dosyaya yönlendirme | `> cevap.txt` içeriği bozulmuyor mu |
 | ☐ | E.7 | Python betikleri | `python`/`py -3` ile çalışıyor mu |
+| ☐ | E.9 | Parametrelerle (ortam değişkeni olmadan) | `-e -k -m` ile üç betik de çalışıyor mu |
+| ☐ | E.10 | `Get-Help` | `Get-Help .\Test-LlmEndpoint.ps1 -Detailed` anlamlı çıktı veriyor mu |
 | ☐ | E.8 | Kurumsal proxy | varsa: takılıyor mu, `NO_PROXY` çözüyor mu |
 
 ## F. Hata ve kenar durumlar
@@ -184,6 +186,6 @@ Bunların hepsi ✅ olmadan başkalarına önermeyelim:
 | --- | --- | --- |
 | 2026-09-01 | llama.cpp chat (Qwen3-30B) | 6/6 sağlıklı · TTFT p50 42ms · ITL 13.7ms · 138 token/s |
 | 2026-09-01 | llama.cpp embeddings (Qwen3-Embedding) | 5/7 + 2 uyarı · paraphrase/alakasız farkı 0.61 |
-| 2026-09-01 | CI: ubuntu · macOS · windows · PowerShell 5.1 | 53/53 · 53/53 · 34/34 · 34/34 |
+| 2026-09-01 | CI: ubuntu · macOS · windows · PowerShell 5.1 | 57/57 · 57/57 · 38/38 · 38/38 |
 
 Ayrıntılar: [compatibility.md](compatibility.md#doğrulanmış-gerçek-backend-sonuçları).

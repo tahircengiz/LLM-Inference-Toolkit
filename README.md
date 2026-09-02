@@ -165,11 +165,11 @@ Her push'ta tüm paket üç işletim sisteminde koşuyor. Bunlar niyet değil, s
 
 | Ortam | Bash betikleri | PowerShell betikleri | Python betikleri | Sonuç |
 | --- | --- | --- | --- | --- |
-| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 53/53 |
-| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 53/53 |
-| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 34/34 |
-| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | 34/34 |
-| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 53/53 |
+| `ubuntu-latest` — Bash 5.x, pwsh 7.6.5, Python 3.14 | ✅ | ✅ | ✅ | 57/57 |
+| `macos-latest` — Bash 3.2.57, pwsh 7.6.4, Python 3.14 | ✅ | ✅ | ✅ | 57/57 |
+| `windows-latest` — pwsh 7.6.5, Python 3.14 | tasarım gereği atlanır | ✅ | ✅ | 38/38 |
+| `windows-latest` — **Windows PowerShell 5.1** | tasarım gereği atlanır | ✅ | ✅ | 38/38 |
+| macOS 26.5 yerel — Bash 3.2.57, pwsh 7.6.3, Python 3.9 | ✅ | ✅ | ✅ | 57/57 |
 
 Embedding sağlık paketi **üç platformda da birebir aynı cosine değerlerini**
 döndürüyor; runbook'lardaki beklenen değerleri yazmaya değer kılan da bu.
@@ -289,7 +289,12 @@ bırakabilirsiniz:
 | `LLM_EMBED_MODEL` | `embed-test.py` | `-m` (`LLM_MODEL`'den önceliklidir) |
 | `LLM_RERANK_MODEL` | `rerank-test.py` | `-m` (`LLM_MODEL`'den önceliklidir) |
 
-Açıkça verilen parametre her zaman ortam değişkenini ezer. `source` edebileceğiniz
+Açıkça verilen parametre her zaman ortam değişkenini ezer. PowerShell
+betiklerinde **kısa biçimler Bash ile aynıdır** (`-e`, `-k`, `-m`, `-i` …) ve
+parametre adları büyük/küçük harf duyarsızdır — yani hiçbir ortam değişkeni
+ayarlamadan `.\powershell\Test-LlmEndpoint.ps1 -e http://... -k sk-xxx -m model`
+doğrudan çalışır. Tam liste:
+[Windows runbook → Parametreler](docs/runbook-windows.md#parametreler). `source` edebileceğiniz
 bir örnek: [`examples/env.example`](examples/env.example).
 
 **Endpoint URL'leri normalize edilir**, yani şu üçü eşdeğerdir:
@@ -365,7 +370,7 @@ PASS  bash: --probe bozuk modeli yakalıyor       MODEL       STATUS    LATENCY 
 PASS  python: TTFT, ITL'den ayrı ölçülüyor       ttft_p50=407ms itl_p50=12ms (sunucu 400ms prefill + 10ms chunk)
 PASS  python: sağlık paketi                      PASS   batch içinde dim tutarlı               dim=128
 ...
-53 geçti, 0 başarısız, 0 atlandı/uyarı
+57 geçti, 0 başarısız, 0 atlandı/uyarı
 ```
 
 Kurulu olmayan çalışma ortamları `FAIL` değil `SKIP` olarak raporlanır, böylece
