@@ -201,6 +201,22 @@ Bunların hepsi ✅ olmadan başkalarına önermeyelim:
 | --- | --- | --- |
 | 2026-09-01 | llama.cpp chat (Qwen3-30B) | 6/6 sağlıklı · TTFT p50 42ms · ITL 13.7ms · 138 token/s |
 | 2026-09-01 | llama.cpp embeddings (Qwen3-Embedding) | 5/7 + 2 uyarı · paraphrase/alakasız farkı 0.61 |
-| 2026-09-01 | CI: ubuntu · macOS · windows · PowerShell 5.1 | 64/64 · 64/64 · 42/42 · 42/42 |
+| 2026-09-02 | Doküman örnekleri (`verify_docs.py`) | 61 örnek · 0 fark |
+| 2026-09-02 | CI: ubuntu · macOS · windows · PowerShell 5.1 · doküman · lint | hepsi yeşil |
+
+### Bu tur bulunan ve düzeltilenler
+
+Gerçek koşumların ve doküman doğrulamanın ortaya çıkardığı, sahte sunucuya
+karşı görünmeyen sorunlar:
+
+| Ne | Nerede görüldü |
+| --- | --- |
+| Tek modelli sunucuda `.Count` hatası (PowerShell 5.1) | Kullanıcı, gerçek gateway |
+| `--full` ayrı embed/rerank endpoint'ini desteklemiyordu | Gerçek backend (chat 8084, embed 8085) |
+| Alt paket UYARI ile geçerken FAIL sayılıyordu | Gerçek backend (quantize model) |
+| Sağlık paketi eşikleri bit-bit determinizm varsayıyordu | Gerçek backend (GGUF) |
+| UTF-8 önizlemesi locale'e göre değişiyordu | Doküman doğrulayıcı |
+| PowerShell istek gövdesinde anahtar sırası kararsızdı | Doküman doğrulayıcı |
+| Kopan bağlantıda traceback (temiz hata yerine) | CI'da yük altında |
 
 Ayrıntılar: [compatibility.md](compatibility.md#doğrulanmış-gerçek-backend-sonuçları).
