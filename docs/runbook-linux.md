@@ -70,7 +70,7 @@ PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
-PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe k"
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir -…"
 PASS  streaming         11 chunk · 322ms
 
 Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
@@ -278,6 +278,7 @@ bash/llm-models.sh
 ```
 mock-model
 mock-embed
+mock-rerank
 error-503
 ```
 
@@ -292,12 +293,13 @@ bash/llm-models.sh -l
 ```
 
 ```
-MODEL       SAHIP  OLUSTURULMA           CONTEXT
-mock-model  mock   2025-01-01T00:00:00Z  8192
-mock-embed  mock   2025-03-01T00:00:00Z  512
-error-503   mock   -                     -
+MODEL        SAHIP  OLUSTURULMA           CONTEXT
+mock-model   mock   2025-01-01T00:00:00Z  8192
+mock-embed   mock   2025-03-01T00:00:00Z  512
+mock-rerank  mock   2025-03-01T00:00:00Z  512
+error-503    mock   -                     -
 
-3 model
+4 model
 ```
 
 **Geçti sayılır:** exit `0` · zaman damgaları UTC ISO-8601 (makineden bağımsız) ·
@@ -327,10 +329,11 @@ bash/llm-models.sh --probe; echo "exit=$?"
 ```
 
 ```
-MODEL       STATUS    LATENCY  NOT
-mock-model  ok           16ms
-mock-embed  400          17ms  bu model chat completions desteklemiyor
-error-503   503          17ms  'error-503' modeli için enjekte edilmiş hata
+MODEL        STATUS    LATENCY  NOT
+mock-model   ok           11ms
+mock-embed   400          11ms  bu model chat completions desteklemiyor
+mock-rerank  400          11ms  bu model chat completions desteklemiyor
+error-503    503          10ms  'error-503' modeli için enjekte edilmiş hata
 
 1/4 model cevap verdi
 exit=1

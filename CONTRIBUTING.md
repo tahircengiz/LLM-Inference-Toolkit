@@ -39,10 +39,15 @@ aşağıdaki kısıtlar onu kilitli bir jump host'ta kullanılabilir kılan şey
 
 ```bash
 python3 tests/smoke_test.py       # yeşil olmalı; yeni davranış için kontrol ekleyin
+python3 tests/verify_docs.py      # dokümandaki örnekler hâlâ üretiliyor mu
 bash -n bash/llm-prompt.sh
 bash -n bash/llm-models.sh
 python3 -m compileall -q python examples tests
 ```
+
+Dokümana bir örnek eklerken çıktısını **gerçekten çalıştırıp** yapıştırın;
+`verify_docs.py` bunu her push'ta kontrol ediyor. Gerçek bir model adı geçen
+örnekler (sahte sunucuda üretilemez) doğrulamadan atlanır.
 
 PowerShell betiklerine dokunduysanız smoke testi `pwsh` kurulu bir makinede
 çalıştırın; aksi halde PowerShell kontrolleri atlanır.

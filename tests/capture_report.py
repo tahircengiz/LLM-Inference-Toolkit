@@ -114,13 +114,26 @@ def main():
     if bash:
         ekle("Sağlık kontrolü — basit", [bash, yol("bash", "llm-check.sh")],
              beklenen="6/6 geçti · exit 0")
-        ekle("Sağlık kontrolü — gelişmiş", [bash, yol("bash", "llm-check.sh"), "--full"],
+        full_argv = [bash, yol("bash", "llm-check.sh"), "--full"]
+        if args.embed_endpoint:
+            full_argv += ["--embed-endpoint", args.embed_endpoint]
+        if args.rerank_endpoint:
+            full_argv += ["--rerank-endpoint", args.rerank_endpoint]
+        ekle("Sağlık kontrolü — gelişmiş", full_argv,
              beklenen="hiç FAIL olmaması · exit 0")
     if pwsh:
         ekle("Sağlık kontrolü — PowerShell",
              [pwsh, "-NoProfile", "-NonInteractive", "-File",
               yol("powershell", "Test-LlmEndpoint.ps1")],
              beklenen="Bash sürümüyle satır satır aynı sonuç")
+        ps_full = [pwsh, "-NoProfile", "-NonInteractive", "-File",
+                   yol("powershell", "Test-LlmEndpoint.ps1"), "-Full"]
+        if args.embed_endpoint:
+            ps_full += ["-EmbedEndpoint", args.embed_endpoint]
+        if args.rerank_endpoint:
+            ps_full += ["-RerankEndpoint", args.rerank_endpoint]
+        ekle("Sağlık kontrolü — PowerShell gelişmiş", ps_full,
+             beklenen="Bash --full ile ayni sonuc")
 
     # --- 2. model keşfi --------------------------------------------------
     if bash:
@@ -131,6 +144,22 @@ def main():
              aciklama="chat dışı modeller (embedding/rerank) 400 dönebilir, bu normaldir")
         ekle("Model doğrulama (--has)",
              [bash, yol("bash", "llm-models.sh"), "--has", args.model],
+             beklenen="sessiz · exit 0")
+
+    if pwsh:
+        # Bu adimlar uzun sure eksikti ve tek modelli sunucudaki PowerShell
+        # hatasinin uretimde bulunmasina sebep oldu. Model yollari her iki
+        # calisma ortaminda da denenmeli.
+        ekle("Model listesi — PowerShell",
+             [pwsh, "-NoProfile", "-NonInteractive", "-File",
+              yol("powershell", "Get-LlmModels.ps1"), "-Long"],
+             beklenen="Bash surumuyle ayni modeller")
+        ekle("Model yoklama — PowerShell",
+             [pwsh, "-NoProfile", "-NonInteractive", "-File",
+              yol("powershell", "Get-LlmModels.ps1"), "-Probe"])
+        ekle("Model dogrulama — PowerShell",
+             [pwsh, "-NoProfile", "-NonInteractive", "-File",
+              yol("powershell", "Get-LlmModels.ps1"), "-Has", args.model],
              beklenen="sessiz · exit 0")
 
     # --- 3. chat ---------------------------------------------------------

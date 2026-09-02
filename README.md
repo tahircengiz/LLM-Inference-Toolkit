@@ -124,6 +124,7 @@ Referans dokümanlar:
 | [`python/embed-test.py`](python/embed-test.py) | Python 3.8+ (yalnızca stdlib) | `/v1/embeddings` | Embed, cosine çiftleri, 7 kontrollük sağlık paketi ve eşzamanlılık benchmark'ı |
 | [`python/rerank-test.py`](python/rerank-test.py) | Python 3.8+ (yalnızca stdlib) | `/v1/rerank` | Sorgu–doküman sıralaması, 8 kontrollük sağlık paketi ve throughput benchmark'ı |
 | [`examples/mock_server.py`](examples/mock_server.py) | Python 3.8+ (yalnızca stdlib) | hepsi | GPU'suz denemek için sahte OpenAI uyumlu sunucu — `-m error-404` ile tekrarlanabilir HTTP hataları da üretir |
+| [`tests/verify_docs.py`](tests/verify_docs.py) | Python 3.8+ (yalnızca stdlib) | — | Dokümandaki her örneği çalıştırıp çıktısını karşılaştırır; "yazan her çıktı doğrulanmıştır" sözünü makineye bağlar |
 | [`tests/capture_report.py`](tests/capture_report.py) | Python 3.8+ (yalnızca stdlib) | hepsi | Gerçek bir endpoint'e karşı tüm bataryayı çalıştırıp markdown rapor üretir (anahtar maskeli) |
 | [`tests/smoke_test.py`](tests/smoke_test.py) | Python 3.8+ (yalnızca stdlib) | — | Yukarıdaki her betiği sahte sunucuya karşı çalıştırır; kurulu olmayan ortamları atlar |
 
@@ -134,11 +135,12 @@ Referans dokümanlar:
 | Katman | Nerede | Neye karşı | Ne doğrular |
 | --- | --- | --- | --- |
 | **1. Smoke** | GitHub Actions: `ubuntu-latest`, `macos-latest`, `windows-latest` + Windows PowerShell 5.1 · her push'ta | Birlikte gelen [sahte sunucu](examples/mock_server.py) | Betiklerin kendisi: parametreler, çıktı biçimi, exit kodları, UTF-8, hata yolları. Hızlı ve tekrarlanabilir |
-| **2. Lint** | GitHub Actions: `ubuntu-latest` | — | ShellCheck + PSScriptAnalyzer (error seviyesi) + Python derleme |
-| **3. Gerçek backend** | Elle, kendi altyapınızda | Gerçek bir inference sunucusu | Sunucunun gerçekten nasıl davrandığı. Sonuçlar [compatibility.md](docs/compatibility.md#doğrulanmış-gerçek-backend-sonuçları) dosyasına yazılır |
+| **2. Doküman** | GitHub Actions: `ubuntu-latest` · her push'ta | Sahte sunucu | Dokümandaki her komut/çıktı çifti gerçekten üretiliyor mu ([`tests/verify_docs.py`](tests/verify_docs.py)) |
+| **3. Lint** | GitHub Actions: `ubuntu-latest` | — | ShellCheck + PSScriptAnalyzer (error seviyesi) + Python derleme |
+| **4. Gerçek backend** | Elle, kendi altyapınızda | Gerçek bir inference sunucusu | Sunucunun gerçekten nasıl davrandığı. Sonuçlar [compatibility.md](docs/compatibility.md#doğrulanmış-gerçek-backend-sonuçları) dosyasına yazılır |
 
-**1. ve 2. katman otomatiktir**; sahte sunucu sayesinde GPU, model ya da ağ
-gerekmez, bu yüzden her push'ta çalışabilir. **3. katman elle yapılır**, çünkü
+**İlk üç katman otomatiktir**; sahte sunucu sayesinde GPU, model ya da ağ
+gerekmez, bu yüzden her push'ta çalışabilir. **4. katman elle yapılır**, çünkü
 her kurulumun endpoint'i farklıdır — ve asıl sürprizlerin çıktığı yer orasıdır:
 sağlık paketinin eşikleri, gerçek bir quantize modelde yanlış alarm verdiği
 görüldükten sonra kalibre edildi.

@@ -257,7 +257,9 @@ print('\t'.join([m.replace('\t',' ').replace('\n',' '), str(c.get('finish_reason
     if [[ "$icerik" == *"�"* ]]; then
         satir FAIL "UTF-8" "yanıtta bozuk karakter (U+FFFD) var"
     elif [[ -n "$icerik" ]]; then
-        onizleme="$(printf '%s' "$icerik" | cut -c1-42)"
+        # Ilk alti kelime: `cut -c` locale'e gore bayt ya da karakter sayar ve
+        # ciktiyi makineye bagimli hale getirirdi; kelime siniri her yerde ayni.
+        onizleme="$(printf '%s' "$icerik" | awk '{ n = (NF < 6 ? NF : 6); for (i = 1; i <= n; i++) printf "%s%s", (i > 1 ? " " : ""), $i; if (NF > 6) printf "…" }')"
         satir PASS "UTF-8" "geçerli · \"${onizleme}\""
     else
         satir UYARI "UTF-8" "içerik boş olduğu için kontrol edilemedi"

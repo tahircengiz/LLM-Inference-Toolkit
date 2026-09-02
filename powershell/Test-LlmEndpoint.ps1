@@ -197,7 +197,7 @@ if ($modelIds.Count -gt 0) {
 # --- 4/5: chat yanıtı ve UTF-8 ----------------------------------------------
 $payload = [ordered]@{
     model       = $Model
-    messages    = @(@{ role = 'user'; content = $ProbePrompt })
+    messages    = @([ordered]@{ role = 'user'; content = $ProbePrompt })
     max_tokens  = 32
     temperature = 0
     stream      = $false
@@ -233,8 +233,11 @@ if ($chatOk) {
     if ($icerik.Contains([char]0xFFFD)) {
         Write-Satir 'FAIL' 'UTF-8' 'yanıtta bozuk karakter (U+FFFD) var'
     } else {
-        $onizleme = $icerik -replace '\s+', ' '
-        if ($onizleme.Length -gt 42) { $onizleme = $onizleme.Substring(0, 42) }
+        # Bash betigiyle ayni: ilk alti kelime. Karakter sayisiyla kesmek
+        # ciktiyi yanitin uzunluguna ve kodlamaya bagimli yapardi.
+        $kelimeler = @((($icerik -replace '\s+', ' ').Trim() -split ' '))
+        $onizleme = ($kelimeler | Select-Object -First 6) -join ' '
+        if ($kelimeler.Count -gt 6) { $onizleme += [char]0x2026 }
         Write-Satir 'PASS' 'UTF-8' ("geçerli · ""{0}""" -f $onizleme)
     }
 } else {

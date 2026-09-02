@@ -24,7 +24,7 @@ yazmayın; `.env` (git tarafından yok sayılır) içinde tutun —
 | Chat | `http://SUNUCU:PORT` | | |
 | Embeddings | `http://SUNUCU:PORT` | | |
 | Gateway (LiteLLM / vLLM router) | `http://SUNUCU:PORT` | | anahtar gerekli mi? |
-| Reranker | `http://SUNUCU:PORT` | | kurulu mu? |
+| Reranker | `http://SUNUCU:7997` | `BAAI/bge-reranker-v2-m3` | [`examples/reranker-compose.yml`](../examples/reranker-compose.yml) ile kaldırılabilir |
 | Windows makinesi | — | — | PowerShell 5.1 + 7 |
 
 Örnek doldurulmuş hali (bu depoyu geliştirirken kullandığımız kurulum): tek
@@ -57,6 +57,7 @@ vermez**.
 | ☐ | 0.2 | Temiz clone'da smoke | `git clone` → `python3 tests/smoke_test.py` | 64 geçti, 0 başarısız |
 | ☐ | 0.3 | `jq` olmadan | `PATH` içinden jq'yu çıkarıp smoke | aynı sonuç (python3 yedeği) |
 | ☐ | 0.4 | `chmod` sonrası doğrudan çalıştırma | `./bash/llm-check.sh -h` | yardım metni |
+| ☐ | 0.5 | Doküman örnekleri | `python3 tests/verify_docs.py` | 0 fark |
 
 ## A. Chat — llama.cpp (`:8084`)
 
@@ -107,8 +108,13 @@ vermez**.
 
 ## D. Rerank
 
-> GTR9'da reranker yok; `bge-reranker-v2-m3` (TEI ya da Infinity) kurulduktan
-> sonra çalıştırılacak. Bugüne kadar yalnızca sahte sunucuya karşı doğrulandı.
+> Bugüne kadar yalnızca sahte sunucuya karşı doğrulandı. Gerçek bir reranker
+> için hazır kurulum: [`examples/reranker-compose.yml`](../examples/reranker-compose.yml)
+> (Infinity, CPU'da çalışır, GPU gerekmez):
+>
+> ```bash
+> docker compose -f examples/reranker-compose.yml up -d
+> ```
 
 | ☐ | # | Ne | Beklenen / kaydedilecek |
 | --- | --- | --- | --- |
@@ -152,18 +158,27 @@ vermez**.
 
 ## G. Doküman doğruluğu
 
-En kritik bölüm: **dokümanda yazan her çıktı gerçekten üretiliyor mu?**
+En kritik bölüm: **dokümanda yazan her çıktı gerçekten üretiliyor mu?** Bu artık
+elle değil, tek komutla:
+
+```bash
+python3 tests/verify_docs.py -v
+```
+
+Araç runbook'lardaki ve referans dokümanlardaki komut/çıktı çiftlerini ayıklar,
+sahte sunucuya karşı koşturur ve karşılaştırır. Zamanla değişen değerler
+(gecikme, tok/s, port) normalize edilir; yapı karşılaştırılır, o anki ölçüm
+değil. CI'da ayrı bir iş olarak her push'ta çalışır.
 
 | ☐ | # | Ne | Nasıl |
 | --- | --- | --- | --- |
-| ☐ | G.1 | Linux runbook B1–B4 | sahte sunucuya karşı tek tek çalıştır, çıktıyı karşılaştır |
-| ☐ | G.2 | Linux runbook L01–L18 | aynısı |
-| ☐ | G.3 | Linux runbook R1–R4 | aynısı |
-| ☐ | G.4 | Linux runbook E01–E06 | aynısı |
-| ☐ | G.5 | Windows runbook B1–B4, W01–W16, R1 | Windows makinesinde |
-| ☐ | G.6 | README örnekleri | kopyala-yapıştır çalışıyor mu |
-| ☐ | G.7 | İç bağlantılar | `python3 -c` link kontrolü (CI dışı, elle) |
-| ☐ | G.8 | Sözlükteki terimler | çıktılarda geçen her terim sözlükte var mı |
+| ☐ | G.1 | Tüm doküman örnekleri | `python3 tests/verify_docs.py` → **0 fark** |
+| ☐ | G.2 | "Dokümanda olmayan satır" uyarıları | her biri bilinçli kısaltma mı, yoksa bayatlama mı? |
+| ☐ | G.3 | Windows runbook örnekleri | Windows makinesinde elle (araç macOS/Linux'ta pwsh ile koşar) |
+| ☐ | G.4 | README örnekleri | kopyala-yapıştır çalışıyor mu |
+| ☐ | G.5 | İç bağlantılar | tüm `.md` dosyalarındaki göreli bağlantılar açılıyor mu |
+| ☐ | G.6 | Sözlükteki terimler | çıktılarda geçen her terim sözlükte var mı |
+| ☐ | G.7 | Gerçek backend değerleri | `compatibility.md`'deki sayılar hangi tarihte hangi sunucudan alındı, yazıyor mu |
 
 ## H. Kabul kriterleri
 

@@ -119,7 +119,7 @@ PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
-PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe kar"
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir -…"
 PASS  streaming         10 chunk · 315ms
 
 Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
@@ -342,6 +342,7 @@ stderr mesajı — PowerShell'in çok satırlı hata bloğu yok.
 ```
 mock-model
 mock-embed
+mock-rerank
 error-503
 ```
 
@@ -356,11 +357,12 @@ kılan da bu.
 ```
 
 ```
-Model      Sahip Olusturulma          Context
------      ----- -----------          -------
-mock-model mock  2025-01-01T00:00:00Z 8192
-mock-embed mock  2025-03-01T00:00:00Z 512
-error-503  mock  -                    -
+Model       Sahip Olusturulma          Context
+-----       ----- -----------          -------
+mock-model  mock  2025-01-01T00:00:00Z 8192
+mock-embed  mock  2025-03-01T00:00:00Z 512
+mock-rerank mock  2025-03-01T00:00:00Z 512
+error-503   mock  -                    -
 ```
 
 **Geçti sayılır:** exit `0` · zaman damgaları UTC ISO-8601, `InvariantCulture` ile
@@ -403,11 +405,12 @@ $LASTEXITCODE
 ```
 
 ```
-Model      Status Ms Not
------      ------ -- ---
-mock-model ok      2
-mock-embed 400     3 bu model chat completions desteklemiyor
-error-503  503     1 'error-503' modeli için enjekte edilmiş hata
+Model       Status Ms Not
+-----       ------ -- ---
+mock-model  ok      3
+mock-embed  400     5 bu model chat completions desteklemiyor
+mock-rerank 400     1 bu model chat completions desteklemiyor
+error-503   503     1 'error-503' modeli için enjekte edilmiş hata
 1/4 model cevap verdi
 1
 ```

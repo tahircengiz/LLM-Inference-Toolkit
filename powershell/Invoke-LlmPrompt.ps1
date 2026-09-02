@@ -129,11 +129,14 @@ if ($isPS5) {
     if ($Insecure) { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } }
 }
 
+# [ordered]: düz hashtable'ın anahtar sırası PowerShell'de garanti değildir ve
+# istek gövdesi koşumdan koşuma farklı yazılırdı. Bash betiği her zaman
+# role,content sırasıyla üretiyor; ikisinin çıktısı karşılaştırılabilir kalmalı.
 $messages = @()
 if (-not [string]::IsNullOrWhiteSpace($SystemPrompt)) {
-    $messages += @{ role = 'system'; content = $SystemPrompt }
+    $messages += [ordered]@{ role = 'system'; content = $SystemPrompt }
 }
-$messages += @{ role = 'user'; content = $Prompt }
+$messages += [ordered]@{ role = 'user'; content = $Prompt }
 
 $payload = [ordered]@{
     model       = $Model

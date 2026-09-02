@@ -88,10 +88,11 @@ llm-models.sh --probe
 ```
 
 ```
-MODEL       STATUS    LATENCY  NOT
-mock-model  ok           16ms
-mock-embed  400          17ms  bu model chat completions desteklemiyor
-error-503   503          17ms  'error-503' modeli için enjekte edilmiş hata
+MODEL        STATUS    LATENCY  NOT
+mock-model   ok           11ms
+mock-embed   400          11ms  bu model chat completions desteklemiyor
+mock-rerank  400          11ms  bu model chat completions desteklemiyor
+error-503    503          10ms  'error-503' modeli için enjekte edilmiş hata
 
 1/4 model cevap verdi
 ```

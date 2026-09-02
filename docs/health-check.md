@@ -46,7 +46,7 @@ PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
-PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe k"
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir -…"
 PASS  streaming         11 chunk · 322ms
 
 Sonuç: 6/6 geçti · 0 uyarı · endpoint sağlıklı (0.4s)
@@ -94,7 +94,7 @@ PASS  erişim            HTTP 200 · 4 model listeleniyor
 PASS  kimlik doğrulama  bearer token kabul edildi
 PASS  model             listede var
 PASS  chat              yanıt geldi · 16 token · finish=stop
-PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir - Türkçe k"
+PASS  UTF-8             geçerli · "Merhaba! Bu bir mock yanittir -…"
 PASS  streaming         11 chunk · 332ms
 
 UYARI model yoklama     1/4 model cevap verdi (detay: llm-models.sh --probe)

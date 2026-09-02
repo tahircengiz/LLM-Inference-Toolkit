@@ -1,0 +1,39 @@
+# Rerank testlerini gerçek bir sunucuya karşı çalıştırmak için tek servislik
+# kurulum. Rerank tarafını yalnızca sahte sunucuya karşı doğrulamış olmak
+# yetmiyor - bu dosya o boşluğu kapatmak için var.
+#
+#   docker compose -f examples/reranker-compose.yml up -d
+#   LLM_ENDPOINT=http://127.0.0.1:7997 LLM_API_KEY=test \
+#     LLM_RERANK_MODEL=BAAI/bge-reranker-v2-m3 python3 python/rerank-test.py --suite
+#
+# Infinity CPU üzerinde çalışır; GPU gerekmez. İlk açılışta model indirilir
+# (~1.2 GB), o yüzden ilk istek yavaştır - `--timeout` değerini artırın ya da
+# healthcheck'in geçmesini bekleyin.
+
+services:
+  reranker:
+    image: michaelf34/infinity:latest-cpu
+    container_name: llm-toolkit-reranker
+    command: >
+      v2
+      --model-id BAAI/bge-reranker-v2-m3
+      --port 7997
+      --engine torch
+    ports:
+      - "7997:7997"
+    volumes:
+      # Model önbelleği: container silinince yeniden indirilmesin
+      - reranker-cache:/app/.cache
+    environment:
+      - HF_HOME=/app/.cache
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7997/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    restart: unless-stopped
+
+volumes:
+  reranker-cache:

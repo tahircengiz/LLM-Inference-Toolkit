@@ -225,7 +225,7 @@ if ($Probe) {
     $results = foreach ($m in $models) {
         $payload = @{
             model       = $m.Model
-            messages    = @(@{ role = 'user'; content = 'ping' })
+            messages    = @([ordered]@{ role = 'user'; content = 'ping' })
             max_tokens  = 1
             temperature = 0
         } | ConvertTo-Json -Depth 6 -Compress
