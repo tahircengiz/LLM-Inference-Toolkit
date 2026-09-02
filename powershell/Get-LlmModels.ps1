@@ -184,7 +184,9 @@ if (-not (Test-HasProperty $obj 'data') -or -not $obj.data) {
     Write-Fail "Yanıtta 'data' dizisi yok:`n$text"
 }
 
-$models = foreach ($m in $obj.data) {
+# @(...) şart: tek modelli bir sunucuda foreach skaler döndürür ve Windows
+# PowerShell 5.1'de StrictMode, skalerde .Count erişimini hata sayar.
+$models = @(foreach ($m in $obj.data) {
     $created = if ((Test-HasProperty $m 'created') -and $m.created) {
         [DateTimeOffset]::FromUnixTimeSeconds([int64]$m.created).UtcDateTime.
             ToString('yyyy-MM-ddTHH:mm:ssZ', [cultureinfo]::InvariantCulture)
@@ -201,7 +203,7 @@ $models = foreach ($m in $obj.data) {
         Olusturulma = $created
         Context     = $context
     }
-}
+})
 
 if ($Pattern) {
     $models = @($models | Where-Object { $_.Model.ToLowerInvariant().Contains($Pattern.ToLowerInvariant()) })

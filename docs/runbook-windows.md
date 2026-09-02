@@ -19,9 +19,9 @@ Linux / macOS / WSL kullanıyorsanız: [runbook-linux.md](runbook-linux.md).
 
 | Ortam | PowerShell | Python | Sonuç |
 | --- | --- | --- | --- |
-| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 38/38 (Bash testleri tasarım gereği atlanır) |
+| `windows-latest` (CI, Windows Server) | 7.6.5 | 3.14.7 | ✅ 42/42 (Bash testleri tasarım gereği atlanır) |
 | macOS üzerinde PowerShell 7.6.3 (yerel) | 7.6.3 | 3.9.6 | ✅ |
-| `windows-latest` (CI, **Windows PowerShell 5.1**) | 5.1 | 3.14.7 | ✅ 38/38 (Bash testleri tasarım gereği atlanır) |
+| `windows-latest` (CI, **Windows PowerShell 5.1**) | 5.1 | 3.14.7 | ✅ 42/42 (Bash testleri tasarım gereği atlanır) |
 
 CI, Windows'ta genellikle yanlış giden şeyi doğruluyor: yanıt temiz UTF-8 olarak
 geliyor, yani `çğışöüÇĞİŞÖÜ` gidiş-dönüşten sağ çıkıyor.
@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File .\powershell\Invoke-LlmPrompt.ps1 "Merh
 Testleri tek tek yerine hepsini birden çalıştırmak için:
 
 ```powershell
-python tests\smoke_test.py     # beklenen: 38 geçti, 0 başarısız, 1 atlandı
+python tests\smoke_test.py     # beklenen: 42 geçti, 0 başarısız, 1 atlandı
 ```
 
 Atlanan, Bash betiğidir — Windows'ta PowerShell olanı kullanılır.

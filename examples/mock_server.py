@@ -167,7 +167,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.rstrip("/").endswith("/v1/models"):
             if not self._authorized():
                 return
-            self._json({"object": "list", "data": CATALOG})
+            katalog = CATALOG
+            if self.server.only:
+                katalog = [m for m in CATALOG if m["id"] == self.server.only]
+            self._json({"object": "list", "data": katalog})
         else:
             self._error(404, "bilinmeyen rota %s" % self.path, "not_found")
 
@@ -340,13 +343,14 @@ class MockServer(ThreadingHTTPServer):
 
 
 def build_server(host="127.0.0.1", port=8899, require_key=True, delay=0.0,
-                 verbose=False, key=None, prefill=None):
+                 verbose=False, key=None, prefill=None, only=None):
     srv = MockServer((host, port), Handler)
     srv.daemon_threads = True
     srv.require_key = require_key
     srv.key = key            # None: herhangi bir boş olmayan token kabul edilir
     srv.delay = delay
     srv.prefill = prefill    # None: chunk gecikmesinin üç katı
+    srv.only = only          # verilirse /v1/models yalnızca bu modeli listeler
     srv.verbose = verbose
     return srv
 
@@ -359,6 +363,9 @@ def main():
                    help="yanıt başına yapay gecikme (saniye)")
     p.add_argument("--no-auth", action="store_true", help="anahtarsız istekleri kabul et")
     p.add_argument("--key", help="yalnızca bu bearer token'ı kabul et (401 yolunu test etmek için)")
+    p.add_argument("--only", metavar="MODEL",
+                   help="/v1/models yalnızca bu modeli listelesin "
+                        "(tek modelli sunucuları taklit etmek için)")
     p.add_argument("--prefill", type=float,
                    help="stream'de ilk token'dan önceki gecikme (saniye); "
                         "varsayılan chunk gecikmesinin üç katı")
@@ -366,7 +373,7 @@ def main():
     args = p.parse_args()
 
     srv = build_server(args.host, args.port, not args.no_auth, args.delay,
-                       args.verbose, args.key, args.prefill)
+                       args.verbose, args.key, args.prefill, args.only)
     print("OpenAI uyumlu sahte sunucu: http://%s:%d/v1  (model: %s, durdurmak için Ctrl-C)"
           % (args.host, args.port, MODEL_ID))
     try:

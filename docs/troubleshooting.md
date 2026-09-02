@@ -34,6 +34,7 @@ internetten erişilebilen hiçbir şey için değil.
 | Terminalde doğru, dosyaya yönlendirince bozuk | Yanıt değil, konsol kod sayfası | Windows'ta: çalıştırmadan önce `[Console]::OutputEncoding = [Text.Encoding]::UTF8`, ya da `-Raw` kullanıp JSON'ı sonradan ayrıştırın |
 | Sadece streaming modunda bozulma | Çok baytlı bir karakter iki SSE chunk'ına bölünmüş | Betikler akışı uçtan uca UTF-8 çözer; kendi ayrıştırıcınızı yazdıysanız karakter değil byte tamponlayın |
 | PowerShell betiğindeki Türkçe metinler bozuk | `.ps1` dosyası BOM'suz kaydedilmiş; 5.1 onu sistem kod sayfasıyla okuyor | Dosyayı UTF-8 **BOM** ile kaydedin (bu depodaki `.ps1` dosyaları öyle) |
+| `The property 'Count' cannot be found on this object` (PowerShell 5.1) | Sunucu tek model döndürdüğünde liste dizi değil tek nesne oluyor; 5.1'de StrictMode skalerde `.Count` erişimini reddediyor | Düzeltildi (2026-09-02). Depoyu güncelleyin: `git pull`. Tek modelli sunucu artık CI'da hem pwsh 7 hem 5.1 ile test ediliyor |
 | Python betiği Windows'ta `UnicodeEncodeError` | Konsol cp1252 | Betikler açılışta stdout/stderr'i UTF-8'e sabitler; kendi betiğinizde `sys.stdout.reconfigure(encoding="utf-8")` kullanın |
 
 ## Streaming hiçbir şey yazmıyor

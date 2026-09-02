@@ -118,6 +118,14 @@ def main():
     threading.Thread(target=ttft_srv.serve_forever, daemon=True).start()
     ttft_base = "http://127.0.0.1:%d" % ttft_port
 
+    # Tek modelli sunucu (llama.cpp gibi). PowerShell 5.1'de tek elemanlı
+    # listeler skaler döner ve StrictMode .Count erişimini hata sayar - bu
+    # gerçek bir kullanıcı hatasıydı, buradan bir daha kaçmasın.
+    tek_port = free_port()
+    tek_srv = mock_server.build_server(port=tek_port, only=mock_server.MODEL_ID)
+    threading.Thread(target=tek_srv.serve_forever, daemon=True).start()
+    tek_base = "http://127.0.0.1:%d" % tek_port
+
     print("sahte sunucu: %s/v1\n" % base)
 
     env = dict(os.environ)
@@ -188,6 +196,14 @@ def main():
         run("bash: sağlık kontrolü yanlış modeli yakalıyor",
             [bash, check_script, "-m", "olmayan-model"], env,
             expect=["SAĞLIKSIZ"], want_code=1)
+        tek_env_b = dict(env, LLM_ENDPOINT=tek_base)
+        run("bash: tek modelli sunucu — liste", [bash, models_script], tek_env_b,
+            expect=[mock_server.MODEL_ID], reject=[mock_server.EMBED_MODEL_ID])
+        run("bash: tek modelli sunucu — probe", [bash, models_script, "--probe"],
+            tek_env_b, expect=["1/1 model cevap verdi"])
+        run("bash: tek modelli sunucu — sağlık kontrolü",
+            [bash, check_script, "-q"], tek_env_b, expect=["endpoint sağlıklı"])
+
         run("bash: sağlık kontrolü yanlış anahtarı yakalıyor",
             [bash, check_script, "-e", auth_base, "-k", "sk-yanlis"], env,
             expect=["kimlik doğrulama", "SAĞLIKSIZ"], want_code=1)
@@ -264,6 +280,18 @@ def main():
             [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_script, "Merhaba",
              "-endpoint", base, "-apikey", "sk-mock", "-model", mock_server.MODEL_ID],
             temiz, expect=[ASCII_MARKER])
+
+        tek_env = dict(env, LLM_ENDPOINT=tek_base)
+        run("powershell: tek modelli sunucu — liste", psrun, tek_env,
+            expect=[mock_server.MODEL_ID], reject=[mock_server.EMBED_MODEL_ID])
+        run("powershell: tek modelli sunucu — tablo", psrun + ["-Long"], tek_env,
+            expect=[mock_server.MODEL_ID, "8192"])
+        # Özet satırı bilinçli olarak stderr'e gider (tablo yönlendirildiğinde
+        # temiz kalsın diye); burada stdout'taki tabloya bakıyoruz.
+        run("powershell: tek modelli sunucu — probe", psrun + ["-Probe"], tek_env,
+            expect=[mock_server.MODEL_ID, "ok"], reject=[mock_server.EMBED_MODEL_ID])
+        run("powershell: tek modelli sunucu — --has", psrun + ["-Has", mock_server.MODEL_ID],
+            tek_env)
 
         ps_check = os.path.join(ROOT, "powershell", "Test-LlmEndpoint.ps1")
         pscheck = [pwsh, "-NoProfile", "-NonInteractive", "-File", ps_check]
@@ -369,6 +397,7 @@ def main():
     srv.shutdown()
     auth_srv.shutdown()
     ttft_srv.shutdown()
+    tek_srv.shutdown()
 
     failed = [r for r in results if r[1] == "FAIL"]
     passed = [r for r in results if r[1] == "PASS"]
