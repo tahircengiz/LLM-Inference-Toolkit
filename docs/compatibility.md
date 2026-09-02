@@ -111,6 +111,9 @@ bir RAG servisi ve gerçek OpenAI'ye giden bir model.
 | Rerank yanıtı | LiteLLM Cohere biçimine çeviriyor: `{"id", "results", "meta"}` — `model` alanı yok, `usage` yerine `meta.billed_units` |
 | `/v1/models` | Alias'ları listeliyor; `CONTEXT` sütunu boş (gateway yayınlamıyor) |
 | Ses zinciri | TTS ile üretilen sesi Whisper'a geri okuttuk: *"Merhaba dünya bu bir testtir."* — ikisi de gateway üzerinden çalışıyor |
+| `dimensions` | ⚠️ Gateway **400 ile reddediyor** (`litellm.UnsupportedParamsError`), doğrudan sunucu ise **sessizce yok sayıp** tam genişlikte vektör döndürüyor. Aynı istek, iki farklı başarısızlık biçimi |
+| Yanlış anahtar | ✅ 401 · doğrudan llama.cpp'de anahtar doğrulaması yok, herhangi bir değer geçiyor |
+| Var olmayan model | ✅ Gateway hata veriyor · doğrudan llama.cpp uydurma adı kabul edip cevap veriyor |
 
 ## Chat (`/v1/chat/completions`)
 
@@ -188,8 +191,12 @@ için tasarlandı.
    döndürür. Doğrudan bir sunucuda `--raw | jq .model` bunu gösterir; **bir
    gateway'in arkasındaysanız göstermez** — LiteLLM istediğiniz alias'ı geri
    yansıtır (2026-09-02'de ölçüldü).
-7. **`dimensions` yok sayılabilir.** Parametreyi kabul edip tam genişlikte vektör
-   dönen bir sunucu, küçük genişlikte kurulmuş bir index'i sessizce bozar.
+7. **`dimensions` yok sayılabilir — ya da reddedilebilir.** 2026-09-02'de aynı
+   istek iki farklı sonuç verdi: doğrudan llama.cpp `dimensions: 256` isteğini
+   kabul edip **1024 boyutlu** vektör döndürdü (sessiz yok sayma), LiteLLM
+   gateway ise **HTTP 400** ile reddetti. Birincisi küçük genişlikte kurulmuş
+   bir index'i sessizce bozar; ikincisi en azından gürültülü başarısız olur.
+   `--dimensions` ile çalıştırıp dönen `dim` değerini kontrol edin.
 
 ## Hiçbir backend olmadan denemek
 

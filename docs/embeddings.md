@@ -130,6 +130,10 @@ Nasıl okunur:
 sekizinci bir kontrol ekleyip sunucunun bunu gerçekten uygulayıp uygulamadığını
 doğrular; sessizce tam genişlikte vektör dönmesini yakalar.
 
+Ölçülmüş iki davranış (2026-09-02): doğrudan llama.cpp parametreyi **kabul edip
+yok sayıyor** (1024 boyut dönüyor), LiteLLM gateway ise **400 ile reddediyor**.
+Yani "hata almadım" demek "uygulandı" demek değil — dönen `dim` değerine bakın.
+
 **`--encoding-format base64`** — JSON sayı dizisi yerine little-endian float32
 blob ister. Büyük batch'lerde hat üzerinde kabaca 3–4 kat daha az bayt demektir;
 betik bunu şeffaf biçimde çözer, çıktı aynıdır. Bir istemci kütüphanesini bu
