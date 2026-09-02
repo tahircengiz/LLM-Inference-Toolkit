@@ -2,38 +2,76 @@
 # kurulum. Rerank tarafını yalnızca sahte sunucuya karşı doğrulamış olmak
 # yetmiyor - bu dosya o boşluğu kapatmak için var.
 #
-#   docker compose -f examples/reranker-compose.yml up -d
-#   LLM_ENDPOINT=http://127.0.0.1:7997 LLM_API_KEY=test \
-#     LLM_RERANK_MODEL=BAAI/bge-reranker-v2-m3 python3 python/rerank-test.py --suite
+# İki seçenek var; hangisini kullanacağınız elinizdekine bağlı:
 #
-# Infinity CPU üzerinde çalışır; GPU gerekmez. İlk açılışta model indirilir
-# (~1.2 GB), o yüzden ilk istek yavaştır - `--timeout` değerini artırın ya da
-# healthcheck'in geçmesini bekleyin.
+#   A) Zaten llama.cpp çalıştırıyorsanız  -> "reranker-llamacpp" servisi
+#      Aynı imaj, aynı GPU, ~640 MB model. Yeni bir yığın kurmanıza gerek yok.
+#      llama.cpp sunucusu --reranking ile /v1/rerank uçlarını açar.
+#
+#   B) Sıfırdan, GPU'suz bir kutuda      -> "reranker-infinity" servisi
+#      CPU'da çalışır, model otomatik indirilir.
+#
+# Test:
+#   LLM_ENDPOINT=http://127.0.0.1:8086 LLM_API_KEY=test \
+#     LLM_RERANK_MODEL=qwen3-reranker python3 python/rerank-test.py --suite
 
 services:
-  reranker:
-    image: michaelf34/infinity:latest-cpu
-    container_name: llm-toolkit-reranker
-    command: >
-      v2
-      --model-id BAAI/bge-reranker-v2-m3
-      --port 7997
-      --engine torch
-    ports:
-      - "7997:7997"
-    volumes:
-      # Model önbelleği: container silinince yeniden indirilmesin
-      - reranker-cache:/app/.cache
-    environment:
-      - HF_HOME=/app/.cache
-    healthcheck:
-      test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7997/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 20
-      start_period: 300s
+  # --- A) llama.cpp (GPU, mevcut kurulumun yanına) ---------------------------
+  reranker-llamacpp:
+    image: ghcr.io/ggml-org/llama.cpp:server-vulkan   # NVIDIA için: server-cuda
+    container_name: reranker-llamacpp
     restart: unless-stopped
+    mem_limit: 2g
+    devices:
+      - /dev/dri            # Vulkan/ROCm; CUDA kullanıyorsanız bu satırı kaldırın
+    volumes:
+      # Modeli önce indirin:
+      #   huggingface-cli download ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF \
+      #     qwen3-reranker-0.6b-q8_0.gguf --local-dir ./models/reranker
+      - ./models/reranker:/models
+    ports:
+      - "8086:8080"
+    command:
+      - -m
+      - /models/qwen3-reranker-0.6b-q8_0.gguf
+      - -a
+      - qwen3-reranker
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -ngl
+      - "99"
+      # Rerank uçlarını açar; olmadan /v1/rerank 404 döner.
+      - --reranking
+      # Reranker sınıflandırma başlığı kullanır: rank pooling zorunlu.
+      - --pooling
+      - rank
+      - -c
+      - "8192"
+      - -ub
+      - "8192"
+      - --metrics
 
-volumes:
-  reranker-cache:
+  # --- B) Infinity (CPU, sıfırdan) ------------------------------------------
+  # Kullanmak için yorumu kaldırın; ilk açılışta modeli kendisi indirir (~1.2 GB),
+  # o yüzden ilk istek yavaştır.
+  #
+  # reranker-infinity:
+  #   image: michaelf34/infinity:latest-cpu
+  #   container_name: reranker-infinity
+  #   command: >
+  #     v2
+  #     --model-id BAAI/bge-reranker-v2-m3
+  #     --port 7997
+  #     --engine torch
+  #   ports:
+  #     - "7997:7997"
+  #   volumes:
+  #     - reranker-cache:/app/.cache
+  #   environment:
+  #     - HF_HOME=/app/.cache
+  #   restart: unless-stopped
+
+# volumes:
+#   reranker-cache:

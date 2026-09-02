@@ -24,7 +24,7 @@ yazmayın; `.env` (git tarafından yok sayılır) içinde tutun —
 | Chat | `http://SUNUCU:PORT` | | |
 | Embeddings | `http://SUNUCU:PORT` | | |
 | Gateway (LiteLLM / vLLM router) | `http://SUNUCU:PORT` | | anahtar gerekli mi? |
-| Reranker | `http://SUNUCU:7997` | `BAAI/bge-reranker-v2-m3` | [`examples/reranker-compose.yml`](../examples/reranker-compose.yml) ile kaldırılabilir |
+| Reranker | `http://SUNUCU:8086` | `Qwen3-Reranker-0.6B` (GGUF) | [`examples/reranker-compose.yml`](../examples/reranker-compose.yml) ile kaldırılabilir |
 | Windows makinesi | — | — | PowerShell 5.1 + 7 |
 
 Örnek doldurulmuş hali (bu depoyu geliştirirken kullandığımız kurulum): tek
@@ -109,12 +109,12 @@ vermez**.
 ## D. Rerank
 
 > Bugüne kadar yalnızca sahte sunucuya karşı doğrulandı. Gerçek bir reranker
-> için hazır kurulum: [`examples/reranker-compose.yml`](../examples/reranker-compose.yml)
-> (Infinity, CPU'da çalışır, GPU gerekmez):
+> için hazır kurulum: [`examples/reranker-compose.yml`](../examples/reranker-compose.yml).
 >
-> ```bash
-> docker compose -f examples/reranker-compose.yml up -d
-> ```
+> **Zaten llama.cpp çalıştırıyorsanız yeni bir yığına gerek yok:** llama.cpp
+> sunucusu `--reranking` ile `/v1/rerank` uçlarını açıyor, yani mevcut
+> kurulumun yanına aynı imajla bir servis daha eklemek yetiyor (~640 MB model).
+> GPU'suz bir kutuda Infinity seçeneği de dosyada hazır.
 
 | ☐ | # | Ne | Beklenen / kaydedilecek |
 | --- | --- | --- | --- |
