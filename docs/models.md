@@ -141,7 +141,7 @@ ekler, bazı gateway'ler yönlendirme bilgisi koyar.
 | **llama.cpp** (`llama-server`) | Yüklü tek model. Chat isteğinde `model` alanı tamamen yok sayıldığı için `--has` chat çağrısından daha bilgilendiricidir |
 | **Ollama** | Çekilmiş tag'ler (`llama3.1:8b`). Herhangi bir bearer token kabul edilir ama gönderilmesi gerekir |
 | **TGI** | Çoğunlukla `tgi` adında tek kayıt |
-| **LiteLLM / gateway'ler** | Upstream model adları değil, sizin sanal alias'larınız. Bir alias listede olup route edilmemiş olabilir — `--probe` tam da bunu yakalar |
+| **LiteLLM / gateway'ler** | Upstream model adları değil, sizin sanal alias'larınız. Bir alias listede olup route edilmemiş olabilir — `--probe` tam da bunu yakalar. Yanıttaki `model` alanı da alias'ı geri yansıtır, upstream'i göstermez |
 | **OpenAI** | Anahtarınızın görebildiği tüm katalog; uzun olur, önce filtreleyin |
 
 Sadece "endpoint çalışıyor mu?" diye soruyorsanız

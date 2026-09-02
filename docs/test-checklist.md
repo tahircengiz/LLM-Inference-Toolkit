@@ -23,8 +23,8 @@ yazmayın; `.env` (git tarafından yok sayılır) içinde tutun —
 | --- | --- | --- | --- |
 | Chat | `http://SUNUCU:PORT` | | |
 | Embeddings | `http://SUNUCU:PORT` | | |
+| Rerank | `http://SUNUCU:PORT` | | [`examples/reranker-compose.yml`](../examples/reranker-compose.yml) ile kaldırılabilir |
 | Gateway (LiteLLM / vLLM router) | `http://SUNUCU:PORT` | | anahtar gerekli mi? |
-| Reranker | `http://SUNUCU:8086` | `Qwen3-Reranker-0.6B` (GGUF) | [`examples/reranker-compose.yml`](../examples/reranker-compose.yml) ile kaldırılabilir |
 | Windows makinesi | — | — | PowerShell 5.1 + 7 |
 
 Örnek doldurulmuş hali (bu depoyu geliştirirken kullandığımız kurulum): tek
@@ -104,7 +104,7 @@ vermez**.
 | ☐ | C.3 | `--probe` | listede olup route edilmeyen alias var mı — bu yardımcının varlık sebebi |
 | ☐ | C.4 | Path önekli endpoint | `.../team-x/v1` biçimi korunuyor mu |
 | ☐ | C.5 | Yanlış anahtar | 401 ve exit 1 |
-| ☐ | C.6 | `--raw \| jq .model` | gateway hangi modele yönlendirdi |
+| ☐ | C.6 | `--raw \| jq .model` | ✅ 2026-09-02: LiteLLM alias'ı geri yansıtıyor, upstream'i **göstermiyor** |
 
 ## D. Rerank
 
@@ -202,6 +202,8 @@ Bunların hepsi ✅ olmadan başkalarına önermeyelim:
 | 2026-09-01 | llama.cpp chat (Qwen3-30B) | 6/6 sağlıklı · TTFT p50 42ms · ITL 13.7ms · 138 token/s |
 | 2026-09-01 | llama.cpp embeddings (Qwen3-Embedding) | 5/7 + 2 uyarı · paraphrase/alakasız farkı 0.61 |
 | 2026-09-02 | Doküman örnekleri (`verify_docs.py`) | 61 örnek · 0 fark |
+| 2026-09-02 | llama.cpp rerank (Qwen3-Reranker-0.6B) | 7/8 + 1 uyarı · ilgili doküman 0.9999, fark 0.96 |
+| 2026-09-02 | LiteLLM gateway (9 alias) | sağlık 7/10 + 3 uyarı · chat, embed, rerank, STT, TTS hepsi erişilebilir |
 | 2026-09-02 | CI: ubuntu · macOS · windows · PowerShell 5.1 · doküman · lint | hepsi yeşil |
 
 ### Bu tur bulunan ve düzeltilenler
@@ -218,5 +220,6 @@ karşı görünmeyen sorunlar:
 | UTF-8 önizlemesi locale'e göre değişiyordu | Doküman doğrulayıcı |
 | PowerShell istek gövdesinde anahtar sırası kararsızdı | Doküman doğrulayıcı |
 | Kopan bağlantıda traceback (temiz hata yerine) | CI'da yük altında |
+| `model` alanının gateway'in arkasını gösterdiği iddiası yanlıştı | Gerçek LiteLLM gateway |
 
 Ayrıntılar: [compatibility.md](compatibility.md#doğrulanmış-gerçek-backend-sonuçları).

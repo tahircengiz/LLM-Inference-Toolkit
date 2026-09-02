@@ -258,8 +258,9 @@ model      finish total
 mock-model stop      17
 ```
 
-**Geçti sayılır:** exit `0` · geçerli JSON · `model` istediğiniz model — sizi
-sessizce başka yere yönlendiren bir gateway'i böyle yakalarsınız.
+**Geçti sayılır:** exit `0` · geçerli JSON · `model` alanı dolu. Bu alanın
+gateway'in arkasını göstermediğine dikkat: alias geri yansıtılır. Ayrıntı:
+[chat-completions.md](chat-completions.md#tarifler).
 
 ### W04 — System prompt ve örnekleme parametreleri
 

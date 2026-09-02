@@ -194,8 +194,12 @@ bash/llm-prompt.sh --raw "Merhaba" | jq -c '{model, finish: .choices[0].finish_r
 {"model":"mock-model","finish":"stop","usage":{"prompt_tokens":1,"completion_tokens":16,"total_tokens":17}}
 ```
 
-**Geçti sayılır:** exit `0` · geçerli JSON · `model` istediğiniz model — sizi
-sessizce başka yere yönlendiren bir gateway'i böyle yakalarsınız.
+**Geçti sayılır:** exit `0` · geçerli JSON · `model` alanı dolu.
+
+`model` alanının ne kadar bilgilendirici olduğu sunucuya bağlıdır: tek modelli
+bir sunucu kendi adını döndürür (uydurma bir ad göndersek bile), bir gateway ise
+istediğiniz alias'ı geri yansıtır. Ayrıntı:
+[chat-completions.md](chat-completions.md#tarifler).
 
 ### L04 — stdin'den prompt
 
@@ -721,7 +725,7 @@ Sahte sunucunun sabit değerleri yerine beklenecekler:
 | B2 | `model yoklama` satırında `n/n model cevap verdi`; embedding modeli varsa `7/7 geçti` |
 | L01 | Gerçek bir yanıt · `finish=stop` (`length` ise `-n` sınırına çarptınız) · tek GPU'da küçük bir model için onlarca–yüzlerce tok/s |
 | L02 | Token'lar kademeli beliriyor. Yanıtın tamamı bir anda geliyorsa bir proxy tamponluyordur — [sorun giderme](troubleshooting.md#streaming-hiçbir-şey-yazmıyor) |
-| L03 | `model` istediğinizle aynı. Farklıysa gateway sizi başka yere yönlendirmiş |
+| L03 | `model` alanı dolu. Bu alanın gateway'in arkasını göstermediğini unutmayın — alias geri yansıtılır |
 | L07 | Bilerek yanlış bir model adı deneyin: sunucunun mesajıyla `HTTP 404` ya da `HTTP 400` bekleyin |
 | L09–L10 | Gerçek katalog. vLLM'de `CONTEXT`, deploy ettiğiniz `--max-model-len` ile aynı olmalı — değilse tartışmayı sunucu kazanmış |
 | L12 | `n/n model cevap verdi`. Aksi durum ya embedding/reranker modelidir (sorun değil — NOT'u okuyun) ya da bozuk route (sorun) |

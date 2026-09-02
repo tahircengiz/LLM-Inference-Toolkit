@@ -162,11 +162,22 @@ done < promptlar.txt > yanitlar.tsv
 time llm-prompt.sh -n 1 "hi" >/dev/null
 ```
 
-**Gateway'in gerçekte nereye yönlendirdiğini görün**
+**Yanıtın ham gövdesine bakın**
 
 ```bash
 llm-prompt.sh --raw "hi" | jq '{model, id, system_fingerprint}'
 ```
+
+> **Dikkat — `model` alanı gateway'in arkasını göstermez.** 2026-09-02'de LiteLLM
+> üzerinde ölçüldü: gateway, **istediğiniz alias'ı olduğu gibi geri yansıtıyor**.
+> `qwen3-14b` isteyip 30B'ye yönlendirildiğinizde bile yanıtta `qwen3-14b`
+> yazıyor. Tek modelli sunucularda ise tam tersi olur: llama.cpp, uydurma bir
+> model adına bile kendi adıyla cevap verir.
+>
+> Yani bu alan yalnızca **doğrudan** konuştuğunuz sunucu için bilgilendiricidir.
+> Gateway'in arkasında ne olduğunu öğrenmek için gateway'in kendi
+> yapılandırmasına bakın; hangi alias'ların gerçekten çalıştığını görmek için
+> [`llm-models.sh --probe`](models.md) kullanın.
 
 **Tekrarlanabilir üretim** — `-t 0` zaten varsayılandır; ancak temperature 0,
 batch'li GPU sunucularında birebir aynı çıktının garantisi değildir

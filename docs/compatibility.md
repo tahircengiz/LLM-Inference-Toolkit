@@ -74,6 +74,44 @@ sağladı: ilk koşumda üç kontrol `FAIL` veriyordu, oysa sapmalar pratikte
 
 
 
+### llama.cpp rerank (Qwen3-Reranker-0.6B) — 2026-09-02
+
+llama.cpp sunucusu `--reranking --pooling rank` ile `/rerank` ve `/v1/rerank`
+uçlarını açıyor; ayrı bir yığın (TEI, Infinity) gerekmiyor.
+
+```
+PASS   her doküman puanlandı                    4 doküman gönderildi, 4 sonuç döndü
+PASS   index'ler geçerli ve benzersiz           index'ler=[1, 3, 2, 0]
+PASS   sonuçlar skora göre azalan sıralı        skorlar=0.9999, 0.0407, 0.0007, 0.0002
+PASS   ilgili doküman ilk sırada                ilk=index 1 · fark=0.9592
+PASS   çağrılar arası deterministik             sıra aynı=evet max|delta|=0.000e+00
+PASS   doküman sırası sonucu değiştirmiyor      ters sırada da aynı doküman ilk=evet · skor farkı=0.000e+00
+PASS   top_n uygulanıyor                        top_n=2 için 2 sonuç döndü
+UYARI  uzun doküman (~132000 karakter) işlendi  sunucu reddetti (HTTP 500) - chunk'lama gerekir
+
+7/8 geçti · 1 uyarı
+```
+
+| Gözlem | Sonuç |
+| --- | --- |
+| Yanıt biçimi | `{"model", "object", "usage", "results": [{"index", "relevance_score"}]}` — Cohere/Jina biçimi |
+| Skor aralığı | 0–1. Türkçe sondaj setinde ilgili doküman **0.9999**, kısmen ilgili 0.0407, alakasız 0.0002 — **fark 0.96**, sahte sunucudaki 0.08'in çok üstünde |
+| Uzun girdi | ✅ Reddediyor ama **HTTP 500** ile, 4xx ile değil. Ingestion tarafında chunk'lama şart |
+| Determinizm | ✅ Birebir (max\|delta\|=0) — chat modelinin aksine batch etkisi yok |
+
+### LiteLLM gateway — 2026-09-02
+
+Dokuz alias'ın hepsi erişilebilir: chat, embedding, rerank, STT (whisper), TTS,
+bir RAG servisi ve gerçek OpenAI'ye giden bir model.
+
+| Gözlem | Sonuç |
+| --- | --- |
+| Sağlık kontrolü | `7/10 geçti · 3 uyarı · endpoint sağlıklı` — uyarılar beklenen: chat dışı modeller (embedding, rerank, STT, TTS) `--probe`'da 4xx döner |
+| `model` alanı | ⚠️ **Gateway alias'ı geri yansıtıyor.** `qwen3-14b` isteyip 30B'ye yönlendirildiğinizde bile yanıtta `qwen3-14b` yazıyor — bu alan gateway'in arkasını **göstermez** |
+| Rerank yanıtı | LiteLLM Cohere biçimine çeviriyor: `{"id", "results", "meta"}` — `model` alanı yok, `usage` yerine `meta.billed_units` |
+| `/v1/models` | Alias'ları listeliyor; `CONTEXT` sütunu boş (gateway yayınlamıyor) |
+| Ses zinciri | TTS ile üretilen sesi Whisper'a geri okuttuk: *"Merhaba dünya bu bir testtir."* — ikisi de gateway üzerinden çalışıyor |
+
 ## Chat (`/v1/chat/completions`)
 
 | Backend | Tipik temel URL | `model` değeri | Auth | Notlar |
@@ -147,7 +185,9 @@ için tasarlandı.
    hattınızın kendi chunk'lama koruması gerekip gerekmediğini belirler.
 6. **`model` alanı dekoratif olabilir.** Tek modelli sunucular alanı tamamen yok
    sayar; gateway'de 404 verecek bir yazım hatası yerelde mutlu mesut cevap
-   döndürür. Önem taşıyorsa `--raw | jq .model` ile kontrol edin.
+   döndürür. Doğrudan bir sunucuda `--raw | jq .model` bunu gösterir; **bir
+   gateway'in arkasındaysanız göstermez** — LiteLLM istediğiniz alias'ı geri
+   yansıtır (2026-09-02'de ölçüldü).
 7. **`dimensions` yok sayılabilir.** Parametreyi kabul edip tam genişlikte vektör
    dönen bir sunucu, küçük genişlikte kurulmuş bir index'i sessizce bozar.
 
