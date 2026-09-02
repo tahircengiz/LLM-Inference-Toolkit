@@ -21,6 +21,7 @@ Modlar:
 """
 
 import argparse
+import http.client
 import base64
 import json
 import math
@@ -109,6 +110,10 @@ class EmbedClient:
             raise SystemExit("HTTP %s from %s\n%s" % (e.code, self.url, detail))
         except urllib.error.URLError as e:
             raise SystemExit("bağlantı kurulamadı %s: %s" % (self.url, e.reason))
+        except (OSError, http.client.HTTPException) as e:
+            # Yük altında sunucu bağlantıyı ortada kapatabilir; bu bir hata
+            # mesajı olmalı, traceback değil.
+            raise SystemExit("bağlantı koptu %s: %s" % (self.url, e))
         elapsed = time.perf_counter() - t0
 
         try:

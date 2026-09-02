@@ -21,6 +21,7 @@ Modlar:
 """
 
 import argparse
+import http.client
 import json
 import math
 import os
@@ -103,6 +104,10 @@ class RerankClient(object):
             raise SystemExit("HTTP %s from %s\n%s" % (e.code, self.url, detay))
         except urllib.error.URLError as e:
             raise SystemExit("bağlantı kurulamadı %s: %s" % (self.url, e.reason))
+        except (OSError, http.client.HTTPException) as e:
+            # Yük altında sunucu bağlantıyı ortada kapatabilir; bu bir hata
+            # mesajı olmalı, traceback değil.
+            raise SystemExit("bağlantı koptu %s: %s" % (self.url, e))
         gecen = time.perf_counter() - t0
 
         try:

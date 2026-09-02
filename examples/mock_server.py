@@ -335,6 +335,10 @@ class MockServer(ThreadingHTTPServer):
     """İstemcinin bağlantıyı erken kapatması normaldir (stream'i yarıda bırakmak,
     `head` ile kesmek gibi); bunun için traceback basmıyoruz."""
 
+    # Varsayılan dinleme kuyruğu 5; benchmark'lar 16 eşzamanlı bağlantı açıyor
+    # ve yüklü bir makinede fazlası düşüyordu.
+    request_queue_size = 128
+
     def handle_error(self, request, client_address):
         hata = sys.exc_info()[1]
         if isinstance(hata, (ConnectionResetError, BrokenPipeError)):
